@@ -2,36 +2,41 @@ import os
 import threading
 import logging
 from flask import Flask
-from telegram import Update
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    filters,
-    ConversationHandler,
-    ContextTypes,
-)
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command, StateFilter
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import Message
+from aiogram.utils.markdown import hbold
 
 # ---------- Логирование ----------
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ---------- Переменные окружения ----------
+# ---------- Конфигурация ----------
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 if not TOKEN:
-    raise ValueError("Переменная TELEGRAM_TOKEN не задана!")
+    raise ValueError("TELEGRAM_TOKEN не задан в переменных окружения")
 
-# ---------- Состояния для ConversationHandler ----------
-NAME, GENDER, AGE, CITY, MAX_RENT, PREFERENCES = range(6)
-
-# ---------- Хранилища данных (в памяти) ----------
+# ---------- Хранилища данных ----------
 profiles = {}          # user_id -> dict с анкетой
-temp_profile = {}      # временные данные при заполнении
 
-# ---------- Flask-приложение для пинга ----------
+# ---------- Определение состояний FSM ----------
+class ProfileForm(StatesGroup):
+    name = State()
+    gender = State()
+    age = State()
+    city = State()
+    max_rent = State()
+    preferences = State()
+
+# ---------- Инициализация бота и диспетчера ----------
+storage = MemoryStorage()
+bot = Bot(token=TOKEN)
+dp = Dispatcher(storage=storage)
+
+# ---------- Flask приложение для пинга ----------
 flask_app = Flask(__name__)
 
 @flask_app.route("/")
@@ -42,15 +47,17 @@ def home():
 def health():
     return "OK", 200
 
-# ---------- Команды бота ----------
+# ---------- Обработчики команд ----------
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
+@dp.message(Command("start"))
+async def cmd_start(message: Message):
+    await message.answer(
         "Привет! Я помогу найти сожителя.\n"
         "Используй /add, чтобы создать анкету, и /find для поиска."
     )
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+@dp.message(Command("help"))
+async def cmd_help(message: Message):
     text = (
         "Доступные команды:\n"
         "/start - приветствие\n"
@@ -59,80 +66,85 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/find - найти сожителей\n"
         "/cancel - отменить заполнение"
     )
-    await update.message.reply_text(text)
+    await message.answer(text)
 
-# ---------- Обработчики ConversationHandler ----------
+# ---------- Начало диалога /add ----------
+@dp.message(Command("add"))
+async def cmd_add(message: Message, state: FSMContext):
+    await state.set_state(ProfileForm.name)
+    await message.answer("Как тебя зовут?")
 
-async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    temp_profile[user_id] = {}
-    await update.message.reply_text("Как тебя зовут?")
-    return NAME
+# ---------- Шаг 1: Имя ----------
+@dp.message(ProfileForm.name)
+async def process_name(message: Message, state: FSMContext):
+    await state.update_data(name=message.text)
+    await state.set_state(ProfileForm.gender)
+    await message.answer("Какой твой пол? (мужской/женский)")
 
-async def ask_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    temp_profile[user_id]["name"] = update.message.text
-    await update.message.reply_text("Какой твой пол? (мужской/женский)")
-    return GENDER
+# ---------- Шаг 2: Пол ----------
+@dp.message(ProfileForm.gender)
+async def process_gender(message: Message, state: FSMContext):
+    await state.update_data(gender=message.text)
+    await state.set_state(ProfileForm.age)
+    await message.answer("Сколько тебе лет? (введите число)")
 
-async def ask_gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    temp_profile[user_id]["gender"] = update.message.text
-    await update.message.reply_text("Сколько тебе лет?")
-    return AGE
+# ---------- Шаг 3: Возраст ----------
+@dp.message(ProfileForm.age)
+async def process_age(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        await message.answer("Пожалуйста, введите число (возраст).")
+        return
+    await state.update_data(age=int(message.text))
+    await state.set_state(ProfileForm.city)
+    await message.answer("В каком городе ищешь жильё?")
 
-async def ask_age(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    try:
-        age = int(update.message.text)
-        temp_profile[user_id]["age"] = age
-        await update.message.reply_text("В каком городе ищешь жильё?")
-        return CITY
-    except ValueError:
-        await update.message.reply_text("Пожалуйста, введи число (возраст).")
-        return AGE
+# ---------- Шаг 4: Город ----------
+@dp.message(ProfileForm.city)
+async def process_city(message: Message, state: FSMContext):
+    await state.update_data(city=message.text)
+    await state.set_state(ProfileForm.max_rent)
+    await message.answer("Какая максимальная арендная плата в месяц (в рублях)?")
 
-async def ask_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    temp_profile[user_id]["city"] = update.message.text
-    await update.message.reply_text("Какая максимальная арендная плата в месяц (в рублях)?")
-    return MAX_RENT
+# ---------- Шаг 5: Бюджет ----------
+@dp.message(ProfileForm.max_rent)
+async def process_max_rent(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        await message.answer("Пожалуйста, введите число.")
+        return
+    await state.update_data(max_rent=int(message.text))
+    await state.set_state(ProfileForm.preferences)
+    await message.answer("Есть ли пожелания по сожителю? (например, некурящий, тишина)")
 
-async def ask_max_rent(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    try:
-        rent = int(update.message.text)
-        temp_profile[user_id]["max_rent"] = rent
-        await update.message.reply_text("Есть ли пожелания по сожителю? (например, некурящий, тишина)")
-        return PREFERENCES
-    except ValueError:
-        await update.message.reply_text("Введи число.")
-        return MAX_RENT
+# ---------- Шаг 6: Предпочтения и сохранение ----------
+@dp.message(ProfileForm.preferences)
+async def process_preferences(message: Message, state: FSMContext):
+    user_data = await state.get_data()
+    # Добавляем user_id и сохраняем
+    profile = {
+        "user_id": message.from_user.id,
+        "name": user_data["name"],
+        "gender": user_data["gender"],
+        "age": user_data["age"],
+        "city": user_data["city"],
+        "max_rent": user_data["max_rent"],
+        "preferences": message.text,
+    }
+    profiles[message.from_user.id] = profile
+    await state.clear()
+    await message.answer("Анкета сохранена! Теперь ищи сожителей через /find")
 
-async def ask_preferences(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    temp_profile[user_id]["preferences"] = update.message.text
-    # Сохраняем анкету
-    profile = temp_profile[user_id]
-    profile["user_id"] = user_id
-    profiles[user_id] = profile
-    del temp_profile[user_id]
-    await update.message.reply_text("Анкета сохранена! Теперь ищи сожителей через /find")
-    return ConversationHandler.END
+# ---------- Отмена ----------
+@dp.message(Command("cancel"))
+async def cmd_cancel(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("Заполнение анкеты отменено.")
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id in temp_profile:
-        del temp_profile[user_id]
-    await update.message.reply_text("Заполнение анкеты отменено.")
-    return ConversationHandler.END
-
-# ---------- Команда /find ----------
-
-async def find(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+# ---------- Поиск /find ----------
+@dp.message(Command("find"))
+async def cmd_find(message: Message):
+    user_id = message.from_user.id
     if user_id not in profiles:
-        await update.message.reply_text("Сначала создай анкету через /add")
+        await message.answer("Сначала создай анкету через /add")
         return
 
     my_profile = profiles[user_id]
@@ -143,7 +155,7 @@ async def find(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
     if not matches:
-        await update.message.reply_text(f"В городе {city} пока нет других анкет.")
+        await message.answer(f"В городе {city} пока нет других анкет.")
         return
 
     result = "Найдены потенциальные сожители:\n"
@@ -153,45 +165,21 @@ async def find(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"бюджет до {p['max_rent']} руб., "
             f"предпочтения: {p['preferences']}\n"
         )
-    await update.message.reply_text(result)
+    await message.answer(result)
 
-# ---------- Запуск бота (в отдельном потоке) ----------
-
+# ---------- Запуск бота в фоновом потоке ----------
 def run_bot():
-    """Создаёт Application и запускает поллинг."""
-    app = Application.builder().token(TOKEN).build()
-
-    # Команды
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("find", find))
-
-    # ConversationHandler для /add
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("add", add)],
-        states={
-            NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_name)],
-            GENDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_gender)],
-            AGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_age)],
-            CITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_city)],
-            MAX_RENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_max_rent)],
-            PREFERENCES: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_preferences)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
-    app.add_handler(conv_handler)
-
+    """Запускает поллинг бота."""
     logger.info("Бот запущен и слушает сообщения...")
-    app.run_polling()
+    dp.run_polling(bot)
 
 # ---------- Точка входа ----------
-
 if __name__ == "__main__":
-    # Запускаем бота в фоновом потоке
+    # Запускаем бота в отдельном потоке
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
 
-    # Запускаем Flask-сервер (главный поток)
+    # Запускаем Flask в главном потоке для поддержки порта
     port = int(os.environ.get("PORT", 5000))
     logger.info(f"Flask сервер запущен на порту {port}")
     flask_app.run(host="0.0.0.0", port=port)
