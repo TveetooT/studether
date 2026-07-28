@@ -9,7 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
-# ---------- Настройка логирования (подробно) ----------
+# ---------- Настройка логирования ----------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # ---------- Конфигурация ----------
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 if not TOKEN:
-    logger.error("❌ TELEGRAM_TOKEN не задан в переменных окружения!")
+    logger.error("❌ TELEGRAM_TOKEN не задан!")
     raise ValueError("TELEGRAM_TOKEN is not set")
 
 logger.info("✅ Токен получен")
@@ -41,7 +41,7 @@ storage = MemoryStorage()
 bot = Bot(token=TOKEN)
 dp = Dispatcher(storage=storage)
 
-# ---------- Flask ----------
+# ---------- Flask (для пинга) ----------
 flask_app = Flask(__name__)
 
 @flask_app.route("/")
@@ -141,16 +141,15 @@ async def cmd_find(message: types.Message):
     )
     await message.answer(text)
 
-# ---------- Функция запуска бота с обработкой ошибок ----------
+# ---------- Функция запуска бота с отключением обработки сигналов ----------
 def run_bot():
-    """Запускает поллинг с перехватом исключений."""
+    """Запускает поллинг без обработки сигналов (работает в фоновом потоке)."""
     try:
         logger.info("🚀 Запуск поллинга бота...")
-        # Запускаем поллинг (синхронный метод, внутри asyncio)
-        dp.run_polling(bot)
+        # КЛЮЧЕВОЙ ПАРАМЕТР: handle_signals=False
+        dp.run_polling(bot, handle_signals=False)
     except Exception as e:
         logger.error(f"❌ Ошибка в боте: {e}", exc_info=True)
-        # Можно попробовать перезапустить, но для простоты просто логируем
 
 # ---------- Точка входа ----------
 if __name__ == "__main__":
@@ -159,7 +158,7 @@ if __name__ == "__main__":
     bot_thread.start()
     logger.info("✅ Поток бота запущен")
 
-    # Запускаем Flask (главный поток)
+    # Запускаем Flask в главном потоке
     port = int(os.environ.get("PORT", 5000))
     logger.info(f"🌐 Flask сервер на порту {port}")
     flask_app.run(host="0.0.0.0", port=port)
