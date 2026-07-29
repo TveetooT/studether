@@ -35,30 +35,17 @@ def new_user_sync(user_id: int):
     except Exception as e:
         logger.error(f"Ошибка при сохранении {user_id}: {e}")
 
-def set_username(user_id: int, username: str):
+def set_string_field(user_id: int, field: str, value: str):
     response = supabase.table("users")\
-        .update({"username": username})\
+        .update({field: value})\
         .eq("user_id", user_id)\
         .execute()
 
-def set_first_name(user_id: int, first_name: str):
+def set_int_field(user_id: int, field: str, value: int):
     response = supabase.table("users")\
-        .update({"first_name": first_name})\
+        .update({field: value})\
         .eq("user_id", user_id)\
         .execute()
-
-def set_last_name(user_id: int, last_name: str):
-    response = supabase.table("users")\
-        .update({"last_name": last_name})\
-        .eq("user_id", user_id)\
-        .execute()
-
-def set_action(user_id: int, action: str):
-    response = supabase.table("users")\
-        .update({"action": action})\
-        .eq("user_id", user_id)\
-        .execute()
-
 # ---------- Бот и диспетчер ----------
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -66,12 +53,10 @@ dp = Dispatcher()
 # ---------- Обработчики команд ----------
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
+    userid = message.from_user.id
     await message.answer("У ромы маленький член!")
-    await asyncio.to_thread(new_user_sync, message.from_user.id)
-    await set_username(message.from_user.id, "test")
-    await set_first_name(message.from_user.id, "test")
-    await set_last_name(message.from_user.id, "test")
-    await set_action(message.from_user.id, "test")
+    await asyncio.to_thread(new_user_sync, userid)
+    await set_string_field(userid, "username", "testname")
 
 
 @dp.message(Command("echo"))
