@@ -44,9 +44,14 @@ dp = Dispatcher()
 # ---------- Обработчик /start ----------
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
+<<<<<<< Updated upstream
     await message.answer("У ромы маленький член!")
     # Вызываем синхронную функцию в отдельном потоке, чтобы не блокировать асинхронный цикл
     await asyncio.to_thread(new_user_sync, message.from_user.id)
+=======
+    await message.answer("Мы сидели дома с моим другом Ромой, он достал огромный")
+    await new_user_sync(message.from_user.id)
+>>>>>>> Stashed changes
 
 # ---------- Эхо-камера для /echo ----------
 @dp.message(Command("echo"))
