@@ -25,7 +25,6 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ---------- Синхронная функция для работы с БД ----------
 def new_user_sync(user_id: int):
-    """Создаёт запись пользователя, если её нет (синхронная версия)."""
     try:
         response = supabase.table("users").upsert(
             {"user_id": user_id}, on_conflict="user_id"
@@ -41,14 +40,13 @@ def new_user_sync(user_id: int):
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# ---------- Обработчик /start ----------
+# ---------- Обработчики команд ----------
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer("У ромы маленький член!")
-    # Вызываем синхронную функцию в отдельном потоке, чтобы не блокировать асинхронный цикл
+    # Выполняем синхронный запрос к БД в отдельном потоке, чтобы не блокировать асинхронный цикл
     await asyncio.to_thread(new_user_sync, message.from_user.id)
 
-# ---------- Эхо-камера для /echo ----------
 @dp.message(Command("echo"))
 async def cmd_echo_message(message: types.Message):
     await message.send_copy(chat_id=message.chat.id)
@@ -56,7 +54,6 @@ async def cmd_echo_message(message: types.Message):
 # ---------- Flask-приложение ----------
 flask_app = Flask(__name__)
 
-# Эндпоинт для пинга (проверка, что бот жив)
 @flask_app.route("/")
 def home():
     return "Бот работает!"
@@ -65,41 +62,38 @@ def home():
 def health():
     return "OK", 200
 
-# Эндпоинт для приёма вебхуков от Telegram
 @flask_app.route("/webhook", methods=["POST"])
 async def webhook():
     """Принимает обновления от Telegram и передаёт их диспетчеру."""
-    # Получаем JSON из запроса
     json_data = request.get_json()
     if not json_data:
         return jsonify({"error": "No data"}), 400
-
-    # Преобразуем JSON в объект Update
+    
     try:
         update = types.Update(**json_data)
-        # Передаём обновление диспетчеру
         await dp.process_update(update)
     except Exception as e:
         logger.error(f"Ошибка при обработке вебхука: {e}")
         return jsonify({"error": "Internal error"}), 500
-
-    # Возвращаем пустой ответ с кодом 200 (Telegram этого ждёт)
+    
     return "", 200
 
-# ---------- Функция установки вебхука ----------
+# ---------- Установка вебхука ----------
 async def set_webhook():
-    """Устанавливает вебхук для бота при старте."""
-    # Публичный URL твоего сервиса (замени, если имя другое)
-    WEBHOOK_URL = "https://studether.onrender.com/webhook"
-    await bot.set_webhook(WEBHOOK_URL)
-    logger.info(f"Вебхук установлен на {WEBHOOK_URL}")
+    """Удаляет старый вебхук и устанавливает новый."""
+    # Сначала удаляем вебхук, чтобы избежать конфликтов
+    await bot.delete_webhook()
+    # Устанавливаем новый вебхук
+    webhook_url = "https://studether.onrender.com/webhook"  # Убедись, что имя совпадает
+    await bot.set_webhook(webhook_url)
+    logger.info(f"Вебхук установлен на {webhook_url}")
 
 # ---------- Точка входа ----------
 if __name__ == "__main__":
-    # Устанавливаем вебхук перед запуском сервера
+    # Устанавливаем вебхук при старте
     asyncio.run(set_webhook())
-
-    # Запускаем Flask-сервер (главный поток)
+    
+    # Запускаем Flask-сервер
     port = int(os.environ.get("PORT", 5000))
     logger.info(f"Flask на порту {port}")
     flask_app.run(host="0.0.0.0", port=port)
