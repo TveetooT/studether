@@ -69,11 +69,7 @@ dp = Dispatcher()
 
 # ---------- Обработчики команд ----------
 Phrases = {
-<<<<<<< Updated upstream
-    "FirstNameMessage": "Привет! Это бот" #После команды /start Запрашиваем имя
-=======
-    "HelloMessage": "👋 Привет! Это бот 🤖" #После команды /start Запрашиваем имя
->>>>>>> Stashed changes
+    "FirstNameMessage": "👋 Привет! Это бот 🤖" #После команды /start Запрашиваем имя
 }
 
 @dp.message(Command("start"))
@@ -81,7 +77,7 @@ async def cmd_start(message: types.Message):
     userid = message.from_user.id
     await asyncio.to_thread(new_user_sync, userid)
     await message.answer("Phrases['FirstNameMessage']")
-    await set_string_field(userid, "action", "name")
+    await set_string_field(userid, "action", "firstname")
 
 @dp.message(Command("profile"))
 async def cmd_profile(message: types.Message):
@@ -106,7 +102,10 @@ async def cmd_test(message: types.Message):
 @dp.message(F.text & ~F.text.startswith('/'))
 async def handle_text(message: types.Message):
     text = message.text
-    ""
+    user_id = message.from_user.id
+    action = get_field(user_id, "action")
+    if (action == "name"):
+        set_string_field(user_id, "firstname", text)
 
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
