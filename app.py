@@ -121,26 +121,46 @@ if __name__ == "__main__":
 
 
 #-----------работа с данными-------------
-def show_profile(data:dict) -> str:
 
-    c_user_id = data.get("id")             # c = current
+def get_user_sync(user_id: int) -> dict | None:
+    """Возвращает словарь со всеми полями пользователя."""
+    response = supabase.table("users").select("*").eq("user_id", user_id).execute()
+    if response.data:
+        return response.data[0]  # первая (и единственная) строка
+    return None
 
-    c_user_photo = data.get("photo")
+def format_profile(data: dict) -> str:
+    c_user_id = data.get("id")
     c_user_name = data.get("username")
     c_user_age = data.get("age")
-    c_user_course = data.get("course")
-    c_user_city = data.get("city")
-    c_user_university = data.get("university")
-    c_user_bio = data.get("bio")
-
-
-
+    # ... остальные поля
     return (
         f"👤 Профиль\n"
-        f"Фото: ебать ты урод\n"
-        f"Имя:  {c_user_name}\n"
-        f"Возраст \n"
+        f"Имя: {c_user_name}\n"
+        f"Возраст: {c_user_age}\n"
     )
+
+
+@dp.message(Command("profile"))
+async def cmd_profile(message: types.Message):
+    user_id = message.from_user.id
+    data = await asyncio.to_thread(get_user_sync, user_id)
+    if data:
+        text = format_profile(data)
+    else:
+        text = "Профиль не найден"
+    await message.answer(text)
+
+
+
+
+
+
+
+
+    
+
+
 
 
 
