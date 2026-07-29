@@ -35,13 +35,13 @@ def new_user_sync(user_id: int):
     except Exception as e:
         logger.error(f"Ошибка при сохранении {user_id}: {e}")
 
-def set_string_field(user_id: int, field: str, value: str):
+async def set_string_field(user_id: int, field: str, value: str):
     response = supabase.table("users")\
         .update({field: value})\
         .eq("user_id", user_id)\
         .execute()
 
-def set_int_field(user_id: int, field: str, value: int):
+async def set_int_field(user_id: int, field: str, value: int):
     response = supabase.table("users")\
         .update({field: value})\
         .eq("user_id", user_id)\
