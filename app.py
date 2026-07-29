@@ -46,6 +46,14 @@ async def set_int_field(user_id: int, field: str, value: int):
         .update({field: value})\
         .eq("user_id", user_id)\
         .execute()
+
+async def get_field(user_id: int, field: str):
+    response = supabase.table("users")\
+        .select(field)\
+        .eq("user_id", user_id)\
+        .execute()
+    return response.data[0][field]
+
 # ---------- Бот и диспетчер ----------
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -54,14 +62,19 @@ dp = Dispatcher()
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     userid = message.from_user.id
-    await message.answer("У ромы маленький член!")
+    await message.answer("Забавы нет - ни ха-ха, ни хо-хо")
     await asyncio.to_thread(new_user_sync, userid)
-    await set_string_field(userid, "username", "testname")
 
 
 @dp.message(Command("echo"))
 async def cmd_echo_message(message: types.Message):
     await message.send_copy(chat_id=message.chat.id)
+
+@dp.message(Command("test"))
+async def cmd_start(message: types.Message):
+    userid = message.from_user.id
+    await message.answer("Тест")
+    await get_field(userid, "username")
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
 async def on_startup(app: web.Application):
