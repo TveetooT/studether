@@ -69,18 +69,14 @@ dp = Dispatcher()
 
 # ---------- Обработчики команд ----------
 Phrases = {
-<<<<<<< Updated upstream
-    "FirstNameMessage": "Привет! Это бот" #После команды /start Запрашиваем имя
-=======
-    "HelloMessage": "👋 Привет! Это бот 🤖" #После команды /start Запрашиваем имя
->>>>>>> Stashed changes
+    "FirstNameMessage": "👋 Привет! Я робот хD.\n Давай найдем для тебя \n сожителя, с которым ты будешь вместе снимать жилье 🏠. \n Как тебя зовут?" #После команды /start Запрашиваем имя
 }
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     userid = message.from_user.id
     await asyncio.to_thread(new_user_sync, userid)
-    await message.answer("Phrases['FirstNameMessage']")
+    await message.answer(Phrases['FirstNameMessage'])
     await set_string_field(userid, "action", "name")
 
 @dp.message(Command("profile"))
