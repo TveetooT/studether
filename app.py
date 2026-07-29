@@ -59,11 +59,16 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 # ---------- Обработчики команд ----------
+Phrases = {
+    "HelloMessage": "Привет! Это бот" #После команды /start Запрашиваем имя
+}
+
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     userid = message.from_user.id
-    await message.answer("Забавы нет - ни ха-ха, ни хо-хо")
     await asyncio.to_thread(new_user_sync, userid)
+    await message.answer("Phrases['HelloMessage']")
+
 
 
 @dp.message(Command("echo"))
@@ -74,9 +79,6 @@ async def cmd_echo_message(message: types.Message):
 async def cmd_test(message: types.Message):
     userid = message.from_user.id
     await message.answer("Тест")
-    sometxt = await get_field(userid, "username")
-    await message.answer(sometxt)
-    await message.answer("Тест2")
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
 async def on_startup(app: web.Application):
