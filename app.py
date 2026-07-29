@@ -72,6 +72,7 @@ dp = Dispatcher()
 async def cmd_start(message: types.Message):
     await message.answer("У ромы маленький член!")
     await asyncio.to_thread(new_user_sync, message.from_user.id)
+    await set_username(message.from_user.id, "piska")
 
 @dp.message(Command("echo"))
 async def cmd_echo_message(message: types.Message):
