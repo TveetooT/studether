@@ -70,8 +70,13 @@ dp = Dispatcher()
 # ---------- Обработчики команд ----------
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
+<<<<<<< Updated upstream
     await message.answer("У ромы маленький член!")
     await asyncio.to_thread(new_user_sync, message.from_user.id)
+=======
+    await message.answer("Мы сидели дома с моим другом Ромой, он достал огромный")
+    await new_user_sync(message.from_user.id)
+>>>>>>> Stashed changes
 
 @dp.message(Command("echo"))
 async def cmd_echo_message(message: types.Message):
@@ -111,6 +116,44 @@ def create_app():
 if __name__ == "__main__":
     app = create_app()
     port = int(os.environ.get("PORT", 5000))
+<<<<<<< Updated upstream
     logger.info(f"Сервер запущен на порту {port}")
     # Запускаем aiohttp-сервер (он сам создаст и управляет циклом событий)
     web.run_app(app, host="0.0.0.0", port=port)
+=======
+    logger.info(f"Flask на порту {port}")
+    flask_app.run(host="0.0.0.0", port=port)
+
+
+
+
+
+
+
+
+#-----------работа с данными-------------
+def show_profile(data:dict) -> str:
+
+    c_user_id = data.get("id")             # c = current
+
+    c_user_photo = data.get("photo")
+    c_user_name = data.get("username")
+    c_user_age = data.get("age")
+    c_user_course = data.get("course")
+    c_user_city = data.get("city")
+    c_user_university = data.get("university")
+    c_user_bio = data.get("bio")
+
+
+
+    return (
+        f"👤 Профиль\n"
+        f"Фото: ебать ты урод\n"
+        f"Имя:  {c_user_name}\n"
+        f"Возраст \n"
+    )
+
+
+
+
+>>>>>>> Stashed changes
