@@ -28,7 +28,7 @@ dp = Dispatcher()
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer("Привет!")
-    reserve_user(message.from_user.id)
+    new_user(message.from_user.id)
 
 
 #------------ Эхо камера --------
@@ -74,12 +74,8 @@ if __name__ == "__main__":
 
 
 # ---------- БД ----------
-def reserve_user(id: int):
-    user = {
-        "user_id": id,
-        "username": None,
-        "first_name": None,
-        "last_name": None
-    }
-    response = supabase.table("users").upsert(user).execute()
-    
+def new_user(id: int):
+    response = supabase.table("users").upsert(
+        {
+            "user_id": id
+        }, on_conflict="user_id").execute()
