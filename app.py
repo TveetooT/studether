@@ -35,6 +35,34 @@ def new_user_sync(user_id: int):
     except Exception as e:
         logger.error(f"Ошибка при сохранении {user_id}: {e}")
 
+def set_username(user_id: int, username: str):
+    response = supabase.table("users")\
+        .update({"first_name": username})\
+        .eq("user_id", user_id)\
+        .execute()
+    print(f"Обновлено: {response.data}")
+
+def set_first_name(user_id: int, first_name: str):
+    response = supabase.table("users")\
+        .update({"first_name": first_name})\
+        .eq("user_id", user_id)\
+        .execute()
+    print(f"Обновлено: {response.data}")
+
+def set_last_name(user_id: int, last_name: str):
+    response = supabase.table("users")\
+        .update({"first_name": last_name})\
+        .eq("user_id", user_id)\
+        .execute()
+    print(f"Обновлено: {response.data}")
+
+def set_action(user_id: int, action: str):
+    response = supabase.table("users")\
+        .update({"first_name": action})\
+        .eq("user_id", user_id)\
+        .execute()
+    print(f"Обновлено: {response.data}")
+
 # ---------- Бот и диспетчер ----------
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
