@@ -1,11 +1,11 @@
 import os
 import logging
 import asyncio
+from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.webhook import aiohttp_server
 from supabase import create_client
-from aiohttp import web
 
 # ---------- Логирование ----------
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +39,7 @@ def new_user_sync(user_id: int):
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# ---------- Обработчики ----------
+# ---------- Обработчики команд ----------
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer("У ромы маленький член!")
@@ -49,38 +49,40 @@ async def cmd_start(message: types.Message):
 async def cmd_echo_message(message: types.Message):
     await message.send_copy(chat_id=message.chat.id)
 
-# ---------- Установка вебхука ----------
-async def on_startup():
+# ---------- Функция установки вебхука (будет вызвана при старте) ----------
+async def on_startup(app: web.Application):
     webhook_url = "https://studether.onrender.com/webhook"
+    # Удаляем старый вебхук на всякий случай
+    await bot.delete_webhook()
     await bot.set_webhook(webhook_url)
     logger.info(f"Вебхук установлен на {webhook_url}")
 
-# ---------- Запуск через aiohttp ----------
-def main():
-    # Создаём приложение aiohttp
+# ---------- Создание aiohttp-приложения ----------
+def create_app():
     app = web.Application()
-    
-    # Эндпоинт для пинга (чтобы Render не думал, что сервер умер)
+
+    # Эндпоинты для пинга (проверки здоровья)
     async def health(request):
         return web.Response(text="OK", status=200)
     app.router.add_get("/", health)
     app.router.add_get("/health", health)
-    
-    # Эндпоинт для вебхука
+
+    # Регистрируем вебхук-обработчик от aiogram
     webhook_requests = aiohttp_server.SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
     )
     webhook_requests.register(app, path="/webhook")
 
-    # Запускаем сервер
+    # Регистрируем функцию, которая выполнится при старте сервера
+    app.on_startup.append(on_startup)
+
+    return app
+
+# ---------- Точка входа ----------
+if __name__ == "__main__":
+    app = create_app()
     port = int(os.environ.get("PORT", 5000))
     logger.info(f"Сервер запущен на порту {port}")
-    
-    # Важно: перед запуском сервера нужно установить вебхук
-    asyncio.run(on_startup())
-    
+    # Запускаем aiohttp-сервер (он сам создаст и управляет циклом событий)
     web.run_app(app, host="0.0.0.0", port=port)
-
-if __name__ == "__main__":
-    main()
