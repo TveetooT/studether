@@ -105,7 +105,8 @@ async def handle_text(message: types.Message):
     user_id = message.from_user.id
     action = await get_field(user_id, "action")     
     if action == "firstname":
-        await set_string_field(user_id, "firstname", text)  
+        await set_string_field(user_id, "firstname", text)
+          
 
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
