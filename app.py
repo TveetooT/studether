@@ -40,28 +40,24 @@ def set_username(user_id: int, username: str):
         .update({"username": username})\
         .eq("user_id", user_id)\
         .execute()
-    print(f"Обновлено: {response.data}")
 
 def set_first_name(user_id: int, first_name: str):
     response = supabase.table("users")\
         .update({"first_name": first_name})\
         .eq("user_id", user_id)\
         .execute()
-    print(f"Обновлено: {response.data}")
 
 def set_last_name(user_id: int, last_name: str):
     response = supabase.table("users")\
         .update({"last_name": last_name})\
         .eq("user_id", user_id)\
         .execute()
-    print(f"Обновлено: {response.data}")
 
 def set_action(user_id: int, action: str):
     response = supabase.table("users")\
         .update({"action": action})\
         .eq("user_id", user_id)\
         .execute()
-    print(f"Обновлено: {response.data}")
 
 # ---------- Бот и диспетчер ----------
 bot = Bot(token=TOKEN)
@@ -72,7 +68,11 @@ dp = Dispatcher()
 async def cmd_start(message: types.Message):
     await message.answer("У ромы маленький член!")
     await asyncio.to_thread(new_user_sync, message.from_user.id)
-    await set_username(message.from_user.id, "piska")
+    await set_username(message.from_user.id, "test")
+    await set_first_name(message.from_user.id, "test")
+    await set_last_name(message.from_user.id, "test")
+    await set_action(message.from_user.id, "test")
+
 
 @dp.message(Command("echo"))
 async def cmd_echo_message(message: types.Message):
