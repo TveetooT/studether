@@ -76,6 +76,7 @@ async def cmd_start(message: types.Message):
     await message.answer("Тест")
     sometxt = get_field(userid, "username")
     await message.answer(sometxt)
+    await message.answer("Тест2")
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
 async def on_startup(app: web.Application):
