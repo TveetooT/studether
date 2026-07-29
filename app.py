@@ -104,7 +104,7 @@ async def handle_text(message: types.Message):
     text = message.text
     user_id = message.from_user.id
     action = get_field(user_id, "action")
-    if (action == "name"):
+    if (action == "firstname"):
         set_string_field(user_id, "firstname", text)
 
 
