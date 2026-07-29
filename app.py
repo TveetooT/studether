@@ -71,10 +71,10 @@ async def cmd_echo_message(message: types.Message):
     await message.send_copy(chat_id=message.chat.id)
 
 @dp.message(Command("test"))
-async def cmd_start(message: types.Message):
+async def cmd_test(message: types.Message):
     userid = message.from_user.id
     await message.answer("Тест")
-    sometxt = get_field(userid, "username")
+    sometxt = await get_field(userid, "username")
     await message.answer(sometxt)
     await message.answer("Тест2")
 
