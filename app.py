@@ -69,7 +69,7 @@ dp = Dispatcher()
 
 # ---------- Обработчики команд ----------
 Phrases = {
-    "FirstNameMessage": "👋 Привет! Я робот хD.\n Давай найдем для тебя \n сожителя, с которым ты будешь вместе снимать жилье 🏠. \n Как тебя зовут?" #После команды /start Запрашиваем имя
+    "FirstNameMessage": "👋 Привет! Я робот хD.\n Давай найдем для тебя \n сожителя, с которым ты будешь вместе снимать жилье 🏠. \n Как тебя зовут?"
 }
 
 @dp.message(Command("start"))
@@ -89,11 +89,6 @@ async def cmd_profile(message: types.Message):
         text = "Профиль не найден"
     await message.answer(text)
 
-
-@dp.message(Command("echo"))
-async def cmd_echo_message(message: types.Message):
-    await message.send_copy(chat_id=message.chat.id)
-
 @dp.message(Command("test"))
 async def cmd_test(message: types.Message):
     userid = message.from_user.id
@@ -106,6 +101,28 @@ async def handle_text(message: types.Message):
     action = await get_field(user_id, "action")     
     if action == "firstname":
         await set_string_field(user_id, "firstname", text)
+        await message.answer(Phrases['AgeMessage'])
+        await set_int_field(user_id, "action", "age")
+    if action == "age":
+        await set_string_field(user_id, "age", text)
+        await message.answer(Phrases['YearMessage'])
+        await set_int_field(user_id, "action", "year")
+    if action == "year":
+        await set_string_field(user_id, "year", text)
+        await message.answer(Phrases['CityMessage'])
+        await set_string_field(user_id, "action", "city")
+    if action == "city":
+        await set_string_field(user_id, "city", text)
+        await message.answer(Phrases['UniverMessage'])
+        await set_string_field(user_id, "action", "univer")
+    if action == "univer":
+        await set_string_field(user_id, "univer", text)
+        await message.answer(Phrases['AboutMessage'])
+        await set_string_field(user_id, "action", "about")
+    if action == "about":
+        await set_string_field(user_id, "about", text)
+        await message.answer(Phrases['RequirementsMessage'])
+        await set_string_field(user_id, "action", "requirements")
           
 
 
@@ -147,16 +164,7 @@ if __name__ == "__main__":
     # Запускаем aiohttp-сервер (он сам создаст и управляет циклом событий)
     web.run_app(app, host="0.0.0.0", port=port)
 
-
-
-
-
-
-
 #-----------работа с данными-------------
-
-
-
 def format_profile(data: dict) -> str:
 
     c_user_id = data.get("id")
