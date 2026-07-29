@@ -46,11 +46,27 @@ dp = Dispatcher()
 # ---------- Обработчик /start ----------
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
+<<<<<<< Updated upstream
     await message.answer("Привет!")
     # Выполняем синхронную операцию в отдельном потоке, чтобы не блокировать событийный цикл
     await asyncio.to_thread(new_user_sync, message.from_user.id)
 
 # ---------- Flask для пинга ----------
+=======
+    await message.answer("С лохами не здороваюсь!")
+    new_user(message.from_user.id)
+
+
+#------------ Эхо камера --------
+@dp.message(Command("echo"))
+async def cmd_echo_message(message: types.Message):
+    #await message.reply(text=message.text)
+    await message.send_copy(chat_id=message.chat.id)
+
+
+
+# ---------- Flask для пинга (чтобы Render не уснул) ----------
+>>>>>>> Stashed changes
 flask_app = Flask(__name__)
 
 @flask_app.route("/")
