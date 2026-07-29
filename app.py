@@ -43,7 +43,7 @@ dp = Dispatcher()
 # ---------- Обработчики команд ----------
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    await message.answer("У ромы маленький член!")
+    await message.answer("Привет!")
     # Выполняем синхронный запрос к БД в отдельном потоке, чтобы не блокировать асинхронный цикл
     await asyncio.to_thread(new_user_sync, message.from_user.id)
 
