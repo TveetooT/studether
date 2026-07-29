@@ -69,6 +69,15 @@ async def cmd_start(message: types.Message):
     await asyncio.to_thread(new_user_sync, userid)
     await message.answer("Phrases['HelloMessage']")
 
+@dp.message(Command("profile"))
+async def cmd_profile(message: types.Message):
+    user_id = message.from_user.id
+    data = await asyncio.to_thread(get_user_sync, user_id)
+    if data:
+        text = format_profile(data)
+    else:
+        text = "Профиль не найден"
+    await message.answer(text)
 
 
 @dp.message(Command("echo"))
@@ -133,27 +142,29 @@ def get_user_sync(user_id: int) -> dict | None:
         return response.data[0]  # первая (и единственная) строка
     return None
 
+
 def format_profile(data: dict) -> str:
     c_user_id = data.get("id")
+    c_user_photo = data.get("photo")
     c_user_name = data.get("username")
     c_user_age = data.get("age")
-    # ... остальные поля
+    c_user_course = data.get("course")
+    c_user_city = data.get("city")
+    c_user_university = data.get("university")
+    c_user_bio = data.get("bio")
+
     return (
         f"👤 Профиль\n"
+        f"Фото: ебать ты урод\n"          # пока так, потом можно менять
         f"Имя: {c_user_name}\n"
         f"Возраст: {c_user_age}\n"
+        f"Курс: {c_user_course}\n"
+        f"Город: {c_user_city}\n"
+        f"Университет: {c_user_university}\n"
+        f"О себе: {c_user_bio}"
     )
 
 
-@dp.message(Command("profile"))
-async def cmd_profile(message: types.Message):
-    user_id = message.from_user.id
-    data = await asyncio.to_thread(get_user_sync, user_id)
-    if data:
-        text = format_profile(data)
-    else:
-        text = "Профиль не найден"
-    await message.answer(text)
 
 
 
