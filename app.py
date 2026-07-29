@@ -4,10 +4,16 @@ import logging
 from flask import Flask
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
+from supabase import create_client
 
 # ---------- Логирование ----------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ---------- Подключение к БД ----------
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ---------- Токен ----------
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -68,13 +74,12 @@ if __name__ == "__main__":
 
 
 # ---------- БД ----------
-
 def reserve_user(id: int):
     user = {
         "user_id": id,
-        "username": NULL,
-        "first_name": NULL,
-        "last_name": NULL
+        "username": None,
+        "first_name": None,
+        "last_name": None
     }
     response = supabase.table("users").upsert(user).execute()
     
