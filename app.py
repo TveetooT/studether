@@ -37,7 +37,7 @@ def new_user_sync(user_id: int):
 
 def set_username(user_id: int, username: str):
     response = supabase.table("users")\
-        .update({"user_name": username})\
+        .update({"username": username})\
         .eq("user_id", user_id)\
         .execute()
     print(f"Обновлено: {response.data}")
