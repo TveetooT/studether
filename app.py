@@ -23,6 +23,15 @@ dp = Dispatcher()
 async def cmd_start(message: types.Message):
     await message.answer("Привет!")
 
+
+#------------эхо камера --------
+@dp.message()
+async def echo_message(message: type.Message):
+    await message.replay(text=message.text)
+    await message.send_copy(chat_id=message.chat.id)
+
+
+
 # ---------- Flask для пинга (чтобы Render не уснул) ----------
 flask_app = Flask(__name__)
 
