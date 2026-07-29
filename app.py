@@ -22,6 +22,7 @@ dp = Dispatcher()
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer("Привет!")
+    reserve_user(message.from_user.id)
 
 
 #------------ Эхо камера --------
@@ -63,3 +64,17 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     logger.info(f"Flask на порту {port}")
     flask_app.run(host="0.0.0.0", port=port)
+
+
+
+# ---------- БД ----------
+
+def reserve_user(id: int):
+    user = {
+        "user_id": id,
+        "username": NULL,
+        "first_name": NULL,
+        "last_name": NULL
+    }
+    response = supabase.table("users").upsert(user).execute()
+    
