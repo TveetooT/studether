@@ -24,10 +24,10 @@ async def cmd_start(message: types.Message):
     await message.answer("Привет!")
 
 
-#------------эхо камера --------
+#------------ Эхо камера --------
 @dp.message()
 async def echo_message(message: types.Message):
-    await message.replay(text=message.text)
+    await message.reply(text=message.text)
     await message.send_copy(chat_id=message.chat.id)
 
 
