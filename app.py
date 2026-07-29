@@ -14,6 +14,19 @@ logger = logging.getLogger(__name__)
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise ValueError("SUPABASE_URL и SUPABASE_KEY должны быть заданы")
+
+# ---------- БД ----------
+async def new_user(id: int):
+    response = supabase.table("users").upsert(
+        {
+            "user_id": id
+        }, on_conflict="user_id").execute()
+    if response.error:
+        logger.info("Ошибка БД")
+    if response.data:
+        logger.info("Удачно БД")
 
 # ---------- Токен ----------
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -29,15 +42,6 @@ dp = Dispatcher()
 async def cmd_start(message: types.Message):
     await message.answer("Привет!")
     new_user(message.from_user.id)
-
-
-#------------ Эхо камера --------
-@dp.message()
-async def echo_message(message: types.Message):
-    await message.reply(text=message.text)
-    await message.send_copy(chat_id=message.chat.id)
-
-
 
 # ---------- Flask для пинга (чтобы Render не уснул) ----------
 flask_app = Flask(__name__)
@@ -70,12 +74,3 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     logger.info(f"Flask на порту {port}")
     flask_app.run(host="0.0.0.0", port=port)
-
-
-
-# ---------- БД ----------
-def new_user(id: int):
-    response = supabase.table("users").upsert(
-        {
-            "user_id": id
-        }, on_conflict="user_id").execute()
