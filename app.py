@@ -144,7 +144,9 @@ def get_user_sync(user_id: int) -> dict | None:
 
 
 def format_profile(data: dict) -> str:
+    
     c_user_id = data.get("id")
+
     c_user_photo = data.get("photo")
     c_user_name = data.get("username")
     c_user_age = data.get("age")
