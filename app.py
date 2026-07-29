@@ -43,14 +43,9 @@ dp = Dispatcher()
 # ---------- Обработчики команд ----------
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-<<<<<<< Updated upstream
     await message.answer("У ромы маленький член!")
     # Выполняем синхронный запрос к БД в отдельном потоке, чтобы не блокировать асинхронный цикл
     await asyncio.to_thread(new_user_sync, message.from_user.id)
-=======
-    await message.answer("Мы сидели дома с моим другом Ромой, он достал огромный")
-    await new_user_sync(message.from_user.id)
->>>>>>> Stashed changes
 
 @dp.message(Command("echo"))
 async def cmd_echo_message(message: types.Message):
@@ -68,21 +63,20 @@ def health():
     return "OK", 200
 
 @flask_app.route("/webhook", methods=["POST"])
-async def webhook():
-    """Принимает обновления от Telegram и передаёт их диспетчеру."""
+def webhook():
     json_data = request.get_json()
     if not json_data:
         return jsonify({"error": "No data"}), 400
-    
+
     try:
         update = types.Update(**json_data)
-        await dp.process_update(update)
+        # Запускаем обработку в синхронном режиме
+        asyncio.run(dp.process_update(update))
     except Exception as e:
         logger.error(f"Ошибка при обработке вебхука: {e}")
         return jsonify({"error": "Internal error"}), 500
-    
-    return "", 200
 
+    return "", 200
 # ---------- Установка вебхука ----------
 async def set_webhook():
     """Удаляет старый вебхук и устанавливает новый."""
