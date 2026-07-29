@@ -1,8 +1,7 @@
 import os
-import threading
 import logging
 import asyncio
-from flask import Flask
+from flask import Flask, request, jsonify
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from supabase import create_client
@@ -34,7 +33,6 @@ def new_user_sync(user_id: int):
         if response.data:
             logger.info(f"Пользователь {user_id} сохранён")
         else:
-            # На всякий случай, если нет data, но и ошибки не было
             logger.warning(f"Неизвестный ответ для {user_id}")
     except Exception as e:
         logger.error(f"Ошибка при сохранении {user_id}: {e}")
@@ -47,20 +45,18 @@ dp = Dispatcher()
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer("У ромы маленький член!")
-    await new_user_sync(message.from_user.id)
+    # Вызываем синхронную функцию в отдельном потоке, чтобы не блокировать асинхронный цикл
+    await asyncio.to_thread(new_user_sync, message.from_user.id)
 
-
-#------------ Эхо камера --------
+# ---------- Эхо-камера для /echo ----------
 @dp.message(Command("echo"))
 async def cmd_echo_message(message: types.Message):
-    #await message.reply(text=message.text)
     await message.send_copy(chat_id=message.chat.id)
 
-
-
-# ---------- Flask для пинга (чтобы Render не уснул) ----------
+# ---------- Flask-приложение ----------
 flask_app = Flask(__name__)
 
+# Эндпоинт для пинга (проверка, что бот жив)
 @flask_app.route("/")
 def home():
     return "Бот работает!"
@@ -69,20 +65,41 @@ def home():
 def health():
     return "OK", 200
 
-# ---------- Запуск бота в фоновом потоке ----------
-def run_bot():
+# Эндпоинт для приёма вебхуков от Telegram
+@flask_app.route("/webhook", methods=["POST"])
+async def webhook():
+    """Принимает обновления от Telegram и передаёт их диспетчеру."""
+    # Получаем JSON из запроса
+    json_data = request.get_json()
+    if not json_data:
+        return jsonify({"error": "No data"}), 400
+
+    # Преобразуем JSON в объект Update
     try:
-        logger.info("Бот запущен")
-        dp.run_polling(bot, handle_signals=False)
+        update = types.Update(**json_data)
+        # Передаём обновление диспетчеру
+        await dp.process_update(update)
     except Exception as e:
-        logger.error(f"Ошибка: {e}")
+        logger.error(f"Ошибка при обработке вебхука: {e}")
+        return jsonify({"error": "Internal error"}), 500
+
+    # Возвращаем пустой ответ с кодом 200 (Telegram этого ждёт)
+    return "", 200
+
+# ---------- Функция установки вебхука ----------
+async def set_webhook():
+    """Устанавливает вебхук для бота при старте."""
+    # Публичный URL твоего сервиса (замени, если имя другое)
+    WEBHOOK_URL = "https://studether.onrender.com/webhook"
+    await bot.set_webhook(WEBHOOK_URL)
+    logger.info(f"Вебхук установлен на {WEBHOOK_URL}")
 
 # ---------- Точка входа ----------
 if __name__ == "__main__":
-    thread = threading.Thread(target=run_bot, daemon=True)
-    thread.start()
-    logger.info("Поток бота запущен")
+    # Устанавливаем вебхук перед запуском сервера
+    asyncio.run(set_webhook())
 
+    # Запускаем Flask-сервер (главный поток)
     port = int(os.environ.get("PORT", 5000))
     logger.info(f"Flask на порту {port}")
     flask_app.run(host="0.0.0.0", port=port)
