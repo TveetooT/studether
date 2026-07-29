@@ -63,20 +63,21 @@ def health():
     return "OK", 200
 
 @flask_app.route("/webhook", methods=["POST"])
-def webhook():
+async def webhook():
+    """Принимает обновления от Telegram и передаёт их диспетчеру."""
     json_data = request.get_json()
     if not json_data:
         return jsonify({"error": "No data"}), 400
-
+    
     try:
         update = types.Update(**json_data)
-        # Запускаем обработку в синхронном режиме
-        asyncio.run(dp.process_update(update))
+        await dp.process_update(update)
     except Exception as e:
         logger.error(f"Ошибка при обработке вебхука: {e}")
         return jsonify({"error": "Internal error"}), 500
-
+    
     return "", 200
+
 # ---------- Установка вебхука ----------
 async def set_webhook():
     """Удаляет старый вебхук и устанавливает новый."""
