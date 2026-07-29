@@ -103,9 +103,9 @@ async def cmd_test(message: types.Message):
 async def handle_text(message: types.Message):
     text = message.text
     user_id = message.from_user.id
-    action = get_field(user_id, "action")
-    if (action == "firstname"):
-        set_string_field(user_id, "firstname", text)
+    action = await get_field(user_id, "action")     
+    if action == "firstname":
+        await set_string_field(user_id, "firstname", text)  
 
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
