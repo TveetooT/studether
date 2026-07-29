@@ -55,13 +55,25 @@ async def get_field(user_id: int, field: str):
         .execute()
     return response.data[0][field]
 
+def get_user_sync(user_id: int) -> dict | None:
+    """Возвращает словарь со всеми полями пользователя."""
+    response = supabase.table("users").select("*").eq("user_id", user_id).execute()
+    if response.data:
+        return response.data[0]  # первая (и единственная) строка
+    return None
+
+
 # ---------- Бот и диспетчер ----------
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 # ---------- Обработчики команд ----------
 Phrases = {
+<<<<<<< Updated upstream
     "FirstNameMessage": "Привет! Это бот" #После команды /start Запрашиваем имя
+=======
+    "HelloMessage": "👋 Привет! Это бот 🤖" #После команды /start Запрашиваем имя
+>>>>>>> Stashed changes
 }
 
 @dp.message(Command("start"))
@@ -143,16 +155,10 @@ if __name__ == "__main__":
 
 #-----------работа с данными-------------
 
-def get_user_sync(user_id: int) -> dict | None:
-    """Возвращает словарь со всеми полями пользователя."""
-    response = supabase.table("users").select("*").eq("user_id", user_id).execute()
-    if response.data:
-        return response.data[0]  # первая (и единственная) строка
-    return None
 
 
 def format_profile(data: dict) -> str:
-    
+
     c_user_id = data.get("id")
 
     c_user_photo = data.get("photo")
