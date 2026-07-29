@@ -76,7 +76,7 @@ Phrases = {
 async def cmd_start(message: types.Message):
     userid = message.from_user.id
     await asyncio.to_thread(new_user_sync, userid)
-    await message.answer("Phrases['FirstNameMessage']")
+    await message.answer(Phrases['FirstNameMessage'])
     await set_string_field(userid, "action", "firstname")
 
 @dp.message(Command("profile"))
