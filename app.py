@@ -5,6 +5,7 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.webhook import aiohttp_server
+from aiogram import F
 from supabase import create_client
 
 # ---------- Логирование ----------
@@ -60,14 +61,15 @@ dp = Dispatcher()
 
 # ---------- Обработчики команд ----------
 Phrases = {
-    "HelloMessage": "Привет! Это бот" #После команды /start Запрашиваем имя
+    "FirstNameMessage": "Привет! Это бот" #После команды /start Запрашиваем имя
 }
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     userid = message.from_user.id
     await asyncio.to_thread(new_user_sync, userid)
-    await message.answer("Phrases['HelloMessage']")
+    await message.answer("Phrases['FirstNameMessage']")
+    await set_string_field(userid, "action", "name")
 
 @dp.message(Command("profile"))
 async def cmd_profile(message: types.Message):
@@ -88,6 +90,12 @@ async def cmd_echo_message(message: types.Message):
 async def cmd_test(message: types.Message):
     userid = message.from_user.id
     await message.answer("Тест")
+
+@dp.message(F.text & ~F.text.startswith('/'))
+async def handle_text(message: types.Message):
+    text = message.text
+    ""
+
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
 async def on_startup(app: web.Application):
