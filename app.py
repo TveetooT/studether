@@ -2,19 +2,17 @@ import os
 import logging
 import asyncio
 from aiohttp import web
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
+from aiogram.types import (
+    BotCommand,                          # 👈 добавил
+    InlineKeyboardMarkup, InlineKeyboardButton,
+    CallbackQuery,
+    ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+)
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 from aiogram.webhook import aiohttp_server
-from aiogram import F
 from supabase import create_client
-from aiogram.types import BotCommand
-from aiogram import Bot
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram import F
-from aiogram.types import CallbackQuery
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
-from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
 # ---------- Логирование ----------
 logging.basicConfig(level=logging.INFO)
@@ -60,14 +58,9 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ---------- Функция для БД ----------
 def new_user_sync(user_id: int):
-    try:
-        response = supabase.table("users").upsert(
-            {"user_id": user_id}, on_conflict="user_id"
-        ).execute()
-        if response.data:
-            logger.info(f"Пользователь {user_id} сохранён")
-    except Exception as e:
-        logger.error(f"Ошибка при сохранении {user_id}: {e}")
+    response = supabase.table("users").upsert(
+        {"user_id": user_id}, on_conflict="user_id"
+    ).execute()
 
 async def set_string_field(user_id: int, field: str, value: str):
     response = supabase.table("users")\
@@ -89,7 +82,6 @@ async def get_field(user_id: int, field: str):
     return response.data[0][field]
 
 def get_user_sync(user_id: int) -> dict | None:
-    """Возвращает словарь со всеми полями пользователя."""
     response = supabase.table("users").select("*").eq("user_id", user_id).execute()
     if response.data:
         return response.data[0]  # первая (и единственная) строка
