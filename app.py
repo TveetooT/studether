@@ -52,6 +52,12 @@ async def set_int_field(user_id: int, field: str, value: int):
         .eq("user_id", user_id)\
         .execute()
 
+async def set_bool_field(user_id: int, field: str, value: bool):
+    response = supabase.table("users")\
+        .update({field: value})\
+        .eq("user_id", user_id)\
+        .execute()
+
 async def get_field(user_id: int, field: str):
     response = supabase.table("users")\
         .select(field)\
@@ -192,7 +198,12 @@ async def handle_text(message: types.Message):
         await set_string_field(user_id, "requirements", text)
         await message.answer(Phrases['FormConfirm'])                
         await message.answer(await get_profile(user_id))
-        await set_string_field(user_id, "action", "Confirm")
+        await set_string_field(user_id, "action", "confirm")
+    if action == "confirm":
+        if text == "true":
+            set_bool_field(user_id, "form", True)
+        if text == "false":
+            set_bool_field(user_id, "form", False)
           
 
 
