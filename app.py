@@ -116,13 +116,13 @@ dp = Dispatcher()
 # ---------- Обработчики команд ----------
 Phrases = {
     "StartMessage": "👋 Привет! Я робот хD.\nДавай найдем для тебя \nдруга, с которым ты будешь вместе снимать жилье 🏠.\nНачни заполнять анкету в /form",
-    "FirstNameMessage1": "Давай знакомиться!",
-    "AgeMessage1": "Возраст",
-    "YearMessage1": "Год обучения", #Если магистратура/аспирантура то год обучения от первого курса
-    "CityMessage1": "Город", 
-    "UniverMessage1": "Вуз",
-    "AboutMessage1": "О себе",
-    "RequirementsMessage1": "Требования к соседу",
+    "FirstNameMessage1": "Как тебя зовут?",
+    "AgeMessage1": "Сколько тебе лет?",
+    "YearMessage1": "Как долго ты уже учишься в Вузе(в годах)?", #Если магистратура/аспирантура то год обучения от первого курса
+    "CityMessage1": "В каком городе ты хочешь найти сожителя", 
+    "UniverMessage1": "Как называется твой ВУЗ?",
+    "AboutMessage1": "Расскажи о себе, что тебе нравится, в чем у тебя все успешно получается.",
+    "RequirementsMessage1": "Что требуешь от соседа?",
     "FormConfirm": "Проверь свою анкету", #Выводу анкету после этого
     "FirstNameMessage2": "Как тебя зовут?",
     "AgeMessage2": "Возраст",
@@ -203,7 +203,7 @@ async def on_startup(app: web.Application):
     # Удаляем старый вебхук на всякий случай
     await bot.delete_webhook()
     await bot.set_webhook(webhook_url)
-    await set_commands(bot)
+    await set_commands(bot) перенесено
 
     logger.info(f"Вебхук установлен на {webhook_url}")
 
