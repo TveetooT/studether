@@ -164,7 +164,7 @@ async def handle_text(message: types.Message):
     if action == "requirements":
         await set_string_field(user_id, "requirements", text)
         await message.answer(Phrases['FormConfirm'])                
-        await message.answer(get_profile(user_id))
+        await message.answer(await get_profile(user_id))
         await set_string_field(user_id, "action", "Confirm")
           
 
