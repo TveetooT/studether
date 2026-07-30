@@ -7,6 +7,8 @@ from aiogram.filters import Command
 from aiogram.webhook import aiohttp_server
 from aiogram import F
 from supabase import create_client
+from aiogram.types import BotCommand
+from aiogram import Bot
 
 # ---------- Логирование ----------
 logging.basicConfig(level=logging.INFO)
@@ -71,6 +73,16 @@ async def get_profile(user_id: int):
         text = None
     return text
 
+# ----------- Выводим профиль -----------
+async def set_commands(bot: Bot):
+    commands = [
+        BotCommand(command="start", description="Запустить бота"),
+        BotCommand(command="help", description="Получить помощь"),
+        BotCommand(command="profile", description="Мой профиль"),
+        BotCommand(command="find", description="Найти сожителя"),
+    ]
+    await bot.set_my_commands(commands)
+
 # ----------- Работа с данными -------------
 async def format_profile(data: dict) -> str:
 
@@ -101,22 +113,34 @@ dp = Dispatcher()
 
 # ---------- Обработчики команд ----------
 Phrases = {
-    "FirstNameMessage": "👋 Привет! Я робот хD.\n Давай найдем для тебя \n сожителя, с которым ты будешь вместе снимать жилье 🏠. \n Как тебя зовут?",
-    "AgeMessage": "Возраст",
-    "YearMessage": "Год обучения", #Если магистратура/аспирантура то год обучения от первого курса
-    "CityMessage": "Город", 
-    "UniverMessage": "Вуз",
-    "AboutMessage": "О себе",
-    "RequirementsMessage": "Требования к соседу",
+    "StartMessage": "👋 Привет! Я робот хD.\nДавай найдем для тебя \nдруга, с которым ты будешь вместе снимать жилье 🏠.\nНачни заполнять анкету в /form",
+    "FirstNameMessage1": "Давай знакомиться!",
+    "AgeMessage1": "Возраст",
+    "YearMessage1": "Год обучения", #Если магистратура/аспирантура то год обучения от первого курса
+    "CityMessage1": "Город", 
+    "UniverMessage1": "Вуз",
+    "AboutMessage1": "О себе",
+    "RequirementsMessage1": "Требования к соседу",
     "FormConfirm": "Проверь свою анкету", #Выводу анкету после этого
+    "FirstNameMessage2": "Как тебя зовут?",
+    "AgeMessage2": "Возраст",
+    "YearMessage2": "Год обучения",
+    "CityMessage2": "Город", 
+    "UniverMessage2": "Вуз",
+    "AboutMessage2": "О себе",
+    "RequirementsMessage2": "Требования к соседу",
 }
+
+@dp.message(Command("test"))
+async def cmd_test(message: types.Message):
+    user_id = message.from_user.id
+    await message.answer("Тест")
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
     await asyncio.to_thread(new_user_sync, user_id)
-    await message.answer(Phrases['FirstNameMessage'])
-    await set_string_field(user_id, "action", "firstname")
+    await message.answer(Phrases['StartMessage'])
 
 @dp.message(Command("profile"))
 async def cmd_profile(message: types.Message):
@@ -127,10 +151,11 @@ async def cmd_profile(message: types.Message):
     else:
         message.answer("Профиль не существует")
 
-@dp.message(Command("test"))
-async def cmd_test(message: types.Message):
+@dp.message(Command("form"))
+async def cmd_form(message: types.Message):
     user_id = message.from_user.id
-    await message.answer("Тест")
+    await message.answer(Phrases['FirstNameMessage'])
+    await set_string_field(user_id, "action", "firstname")
 
 @dp.message(F.text & ~F.text.startswith('/'))
 async def handle_text(message: types.Message):
