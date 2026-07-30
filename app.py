@@ -11,6 +11,10 @@ from aiogram.types import BotCommand
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram import F
+from aiogram.types import CallbackQuery
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
 # ---------- Логирование ----------
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +29,31 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("SUPABASE_URL и SUPABASE_KEY должны быть заданы")
+
+# ---------- Словари ----------
+Phrases = {
+    "StartMessage": "👋 Привет! Я робот хD.\nДавай найдем для тебя \nдруга, с которым ты будешь вместе снимать жилье 🏠.\nНачни заполнять анкету в /form",
+    "FirstNameMessage1": "Как тебя зовут?",
+    "AgeMessage1": "Сколько тебе лет?",
+    "YearMessage1": "Как долго ты уже учишься в Вузе(в годах)?", #Если магистратура/аспирантура то год обучения от первого курса
+    "CityMessage1": "В каком городе ты хочешь найти сожителя", 
+    "UniverMessage1": "Как называется твой ВУЗ?",
+    "AboutMessage1": "Расскажи о себе, что тебе нравится, в чем у тебя все успешно получается.",
+    "RequirementsMessage1": "Что требуешь от соседа?",
+    "FormConfirm": "Проверь свою анкету", #Выводу анкету после этого
+    "FirstNameMessage2": "Как тебя зовут?",
+    "AgeMessage2": "Возраст",
+    "YearMessage2": "Год обучения",
+    "CityMessage2": "Город", 
+    "UniverMessage2": "Вуз",
+    "AboutMessage2": "О себе",
+    "RequirementsMessage2": "Требования к соседу",
+}
+
+Buttons = {
+    "ConfirmForm": "",
+    "RestartForm": ""
+}
 
 # ---------- Подключение к БД ----------
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -92,6 +121,19 @@ async def set_commands(bot: Bot):
     ]
     await bot.set_my_commands(commands)
 
+# ---------- Reply Клавиатуры ----------
+# ---------- Главная клавиатура ----------
+MainReplyKeyboardBuilder = ReplyKeyboardBuilder()
+MainReplyKeyboardBuilder.button(text=Buttons["Profile"])
+MainReplyKeyboardBuilder.button(text=Buttons["Find"])
+MainReplyKeyboardBuilder.adjust(1, 2) #Ряды, столбцы
+MainMenuKeyboard = MainReplyKeyboardBuilder.as_markup(resize_keyboard=True)
+
+FormConfirmKeyboardBuilder = ReplyKeyboardBuilder()
+FormConfirmKeyboardBuilder.button(text=Buttons["ConfirmForm"])
+FormConfirmKeyboardBuilder.button(text=Buttons["RestartForm"])
+FormConfirmKeyboardBuilder.adjust(1, 2)
+FormConfirmKeyboard = FormConfirmKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 # ----------- Работа с данными -------------
 async def format_profile(data: dict) -> str:
 
@@ -119,29 +161,6 @@ async def format_profile(data: dict) -> str:
 # ---------- Бот и диспетчер ----------
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
-
-# ---------- Обработчики команд ----------
-Phrases = {
-    "StartMessage": "👋 Привет! Я робот хD.\nДавай найдем для тебя \nдруга, с которым ты будешь вместе снимать жилье 🏠.\nНачни заполнять анкету в /form",
-    "FirstNameMessage1": "Как тебя зовут?",
-    "AgeMessage1": "Сколько тебе лет?",
-    "YearMessage1": "Как долго ты уже учишься в Вузе(в годах)?", #Если магистратура/аспирантура то год обучения от первого курса
-    "CityMessage1": "В каком городе ты хочешь найти сожителя", 
-    "UniverMessage1": "Как называется твой ВУЗ?",
-    "AboutMessage1": "Расскажи о себе, что тебе нравится, в чем у тебя все успешно получается.",
-    "RequirementsMessage1": "Что требуешь от соседа?",
-    "PhotoMessage1": "Отправь красивые фотографии. Одну себя и 1-2 квартиры",
-
-    "FormConfirm": "Проверь свою анкету", #Выводу анкету после этого
-    "FirstNameMessage2": "Как тебя зовут?",
-    "AgeMessage2": "Возраст",
-    "YearMessage2": "Год обучения",
-    "CityMessage2": "Город", 
-    "UniverMessage2": "Вуз",
-    "AboutMessage2": "О себе",
-    "RequirementsMessage2": "Требования к соседу",
-    "PhotoMessasge2": "Твои красивые фотки"
-}
 
 @dp.message(Command("test"))
 async def cmd_test(message: types.Message):
@@ -216,7 +235,7 @@ async def handle_text(message: types.Message):
         await set_string_field(user_id, "action", "confirm")
     if action == "confirm":
         await set_string_field(user_id, "form", "true")
-        if text == "false":
+        if text == Buttons["RestartForm"]:
             await cmd_form()
           
 
