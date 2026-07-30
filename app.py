@@ -52,12 +52,6 @@ async def set_int_field(user_id: int, field: str, value: int):
         .eq("user_id", user_id)\
         .execute()
 
-async def set_bool_field(user_id: int, field: str, value: bool):
-    response = supabase.table("users")\
-        .update({field: value})\
-        .eq("user_id", user_id)\
-        .execute()
-
 async def get_field(user_id: int, field: str):
     response = supabase.table("users")\
         .select(field)\
@@ -80,6 +74,13 @@ async def get_profile(user_id: int):
     else:
         text = None
     return text
+
+# ----------- Старт анкеты -----------
+async def start_form(message: types.Message, user_id: int):
+    await message.answer(Phrases['FirstNameMessage1'])
+    if await get_field(user_id, "form") != "true":
+        await message.answer(Phrases['FirstNameMessage2'])
+    await set_string_field(user_id, "action", "firstname")
 
 # ----------- Меню команд -----------
 async def set_commands(bot: Bot):
@@ -165,8 +166,7 @@ async def cmd_profile(message: types.Message):
 @dp.message(Command("form"))
 async def cmd_form(message: types.Message):
     user_id = message.from_user.id
-    await message.answer(Phrases['FirstNameMessage'])
-    await set_string_field(user_id, "action", "firstname")
+    await start_form(message, user_id)
 
 @dp.message(F.text & ~F.text.startswith('/'))
 async def handle_text(message: types.Message):
@@ -175,38 +175,49 @@ async def handle_text(message: types.Message):
     action = await get_field(user_id, "action")     
     if action == "firstname":
         await set_string_field(user_id, "firstname", text)
-        await message.answer(Phrases['AgeMessage'])
+        if await get_field(user_id, "form") != "true":
+            await message.answer(Phrases['AgeMessage2'])
+        await message.answer(Phrases['AgeMessage1'])
         await set_int_field(user_id, "action", "age")
     if action == "age":
         await set_string_field(user_id, "age", text)
-        await message.answer(Phrases['YearMessage'])
+        if await get_field(user_id, "form") != "true":
+            await message.answer(Phrases['YearMessage2'])
+        await message.answer(Phrases['YearMessage1'])
         await set_int_field(user_id, "action", "year")
     if action == "year":
         await set_string_field(user_id, "year", text)
-        await message.answer(Phrases['CityMessage'])
+        if await get_field(user_id, "form") != "true":
+            await message.answer(Phrases['CityMessage2'])
+        await message.answer(Phrases['CityMessage1'])
         await set_string_field(user_id, "action", "city")
     if action == "city":
         await set_string_field(user_id, "city", text)
-        await message.answer(Phrases['UniverMessage'])
+        if await get_field(user_id, "form") != "true":
+            await message.answer(Phrases['UniverMessage2'])
+        await message.answer(Phrases['UniverMessage1'])
         await set_string_field(user_id, "action", "univer")
     if action == "univer":
         await set_string_field(user_id, "univer", text)
-        await message.answer(Phrases['AboutMessage'])
+        if await get_field(user_id, "form") != "true":
+            await message.answer(Phrases['AboutMessage2'])
+        await message.answer(Phrases['AboutMessage1'])
         await set_string_field(user_id, "action", "about")
     if action == "about":
         await set_string_field(user_id, "about", text)
-        await message.answer(Phrases['RequirementsMessage'])
+        if await get_field(user_id, "form") != "true":
+            await message.answer(Phrases['RequirementsMessage2'])
+        await message.answer(Phrases['RequirementsMessage1'])
         await set_string_field(user_id, "action", "requirements")
     if action == "requirements":
         await set_string_field(user_id, "requirements", text)
-        await message.answer(Phrases['FormConfirm'])                
+        await message.answer(Phrases['FormConfirm'])
         await message.answer(await get_profile(user_id))
         await set_string_field(user_id, "action", "confirm")
     if action == "confirm":
-        if text == "true":
-            set_bool_field(user_id, "form", True)
+        await set_string_field(user_id, "form", "true")
         if text == "false":
-            set_bool_field(user_id, "form", False)
+            await cmd_form()
           
 
 
@@ -217,7 +228,7 @@ async def on_startup(app: web.Application):
     # Удаляем старый вебхук на всякий случай
     await bot.delete_webhook()
     await bot.set_webhook(webhook_url)
-    await set_commands(bot) перенесено
+    await set_commands(bot) 
 
     logger.info(f"Вебхук установлен на {webhook_url}")
 
