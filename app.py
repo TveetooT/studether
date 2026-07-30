@@ -97,7 +97,7 @@ async def cmd_start(message: types.Message):
 @dp.message(Command("profile"))
 async def cmd_profile(message: types.Message):
     user_id = message.from_user.id
-    text = get_profile(user_id)
+    text = await get_profile(user_id)
     if text != None:
         await message.answer(text)
     else:
