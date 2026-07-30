@@ -129,6 +129,8 @@ Phrases = {
     "UniverMessage1": "Как называется твой ВУЗ?",
     "AboutMessage1": "Расскажи о себе, что тебе нравится, в чем у тебя все успешно получается.",
     "RequirementsMessage1": "Что требуешь от соседа?",
+    "PhotoMessage1": "Отправь красивые фотографии. Одну себя и 1-2 квартиры",
+
     "FormConfirm": "Проверь свою анкету", #Выводу анкету после этого
     "FirstNameMessage2": "Как тебя зовут?",
     "AgeMessage2": "Возраст",
@@ -137,6 +139,7 @@ Phrases = {
     "UniverMessage2": "Вуз",
     "AboutMessage2": "О себе",
     "RequirementsMessage2": "Требования к соседу",
+    "PhotoMessasge2": "Твои красивые фотки"
 }
 
 @dp.message(Command("test"))
