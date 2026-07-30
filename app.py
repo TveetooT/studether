@@ -78,7 +78,7 @@ async def get_profile(user_id: int):
 # ----------- Старт анкеты -----------
 async def start_form(message: types.Message, user_id: int):
     await message.answer(Phrases['FirstNameMessage1'])
-    if await get_field(user_id, "form") == "false":
+    if await get_field(user_id, "form") != "true":
         await message.answer(Phrases['FirstNameMessage2'])
     await set_string_field(user_id, "action", "firstname")
 
@@ -172,37 +172,37 @@ async def handle_text(message: types.Message):
     action = await get_field(user_id, "action")     
     if action == "firstname":
         await set_string_field(user_id, "firstname", text)
-        if await get_field(user_id, "form") == "false":
+        if await get_field(user_id, "form") != "true":
             await message.answer(Phrases['AgeMessage2'])
         await message.answer(Phrases['AgeMessage1'])
         await set_int_field(user_id, "action", "age")
     if action == "age":
         await set_string_field(user_id, "age", text)
-        if await get_field(user_id, "form") == "false":
+        if await get_field(user_id, "form") != "true":
             await message.answer(Phrases['YearMessage2'])
         await message.answer(Phrases['YearMessage1'])
         await set_int_field(user_id, "action", "year")
     if action == "year":
         await set_string_field(user_id, "year", text)
-        if await get_field(user_id, "form") == "false":
+        if await get_field(user_id, "form") != "true":
             await message.answer(Phrases['CityMessage2'])
         await message.answer(Phrases['CityMessage1'])
         await set_string_field(user_id, "action", "city")
     if action == "city":
         await set_string_field(user_id, "city", text)
-        if await get_field(user_id, "form") == "false":
+        if await get_field(user_id, "form") != "true":
             await message.answer(Phrases['UniverMessage2'])
         await message.answer(Phrases['UniverMessage1'])
         await set_string_field(user_id, "action", "univer")
     if action == "univer":
         await set_string_field(user_id, "univer", text)
-        if await get_field(user_id, "form") == "false":
+        if await get_field(user_id, "form") != "true":
             await message.answer(Phrases['AboutMessage2'])
         await message.answer(Phrases['AboutMessage1'])
         await set_string_field(user_id, "action", "about")
     if action == "about":
         await set_string_field(user_id, "about", text)
-        if await get_field(user_id, "form") == "false":
+        if await get_field(user_id, "form") != "true":
             await message.answer(Phrases['RequirementsMessage2'])
         await message.answer(Phrases['RequirementsMessage1'])
         await set_string_field(user_id, "action", "requirements")
