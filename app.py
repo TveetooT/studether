@@ -62,6 +62,14 @@ def get_user_sync(user_id: int) -> dict | None:
         return response.data[0]  # первая (и единственная) строка
     return None
 
+# ----------- Выводим профиль -----------
+async def get_profile(user_id: int):
+    data = await asyncio.to_thread(get_user_sync, user_id)
+    if data:
+        text = format_profile(data)
+    else:
+        text = None
+    return text
 
 # ---------- Бот и диспетчер ----------
 bot = Bot(token=TOKEN)
@@ -199,14 +207,6 @@ def format_profile(data: dict) -> str:
         f"О себе: {c_user_bio}"
     )
 
-# ----------- Выводим профиль -----------
-async def get_profile(user_id: int):
-    data = await asyncio.to_thread(get_user_sync, user_id)
-    if data:
-        text = format_profile(data)
-    else:
-        text = None
-    return text
 
 
 
