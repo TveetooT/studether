@@ -100,7 +100,7 @@ async def format_profile(data: dict) -> str:
 
     return (
         f"👤 Профиль\n"
-        f"Фото: ебать ты урод\n"          # пока так, потом можно менять
+        f"Фото: ебать ты \n"          # пока так, потом можно менять
         f"Имя: {c_user_name}\n"
         f"Возраст: {c_user_age}\n"
         f"Курс: {c_user_course}\n"
@@ -199,10 +199,14 @@ async def handle_text(message: types.Message):
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
 async def on_startup(app: web.Application):
     webhook_url = "https://studether.onrender.com/webhook"
+    
     # Удаляем старый вебхук на всякий случай
     await bot.delete_webhook()
     await bot.set_webhook(webhook_url)
+    await set_commands(bot)
+
     logger.info(f"Вебхук установлен на {webhook_url}")
+
 
 # ---------- Создание aiohttp-приложения ----------
 def create_app():
