@@ -66,10 +66,34 @@ def get_user_sync(user_id: int) -> dict | None:
 async def get_profile(user_id: int):
     data = await asyncio.to_thread(get_user_sync, user_id)
     if data:
-        text = format_profile(data)
+        text = await format_profile(data)
     else:
         text = None
     return text
+
+# ----------- Работа с данными -------------
+async def format_profile(data: dict) -> str:
+
+    c_user_id = data.get("id")
+
+    c_user_photo = data.get("photo")
+    c_user_name = data.get("username")
+    c_user_age = data.get("age")
+    c_user_course = data.get("course")
+    c_user_city = data.get("city")
+    c_user_university = data.get("university")
+    c_user_bio = data.get("bio")
+
+    return (
+        f"👤 Профиль\n"
+        f"Фото: ебать ты урод\n"          # пока так, потом можно менять
+        f"Имя: {c_user_name}\n"
+        f"Возраст: {c_user_age}\n"
+        f"Курс: {c_user_course}\n"
+        f"Город: {c_user_city}\n"
+        f"Университет: {c_user_university}\n"
+        f"О себе: {c_user_bio}"
+    )
 
 # ---------- Бот и диспетчер ----------
 bot = Bot(token=TOKEN)
@@ -182,31 +206,6 @@ if __name__ == "__main__":
     logger.info(f"Сервер запущен на порту {port}") 
     # Запускаем aiohttp-сервер (он сам создаст и управляет циклом событий)
     web.run_app(app, host="0.0.0.0", port=port)
-
-# ----------- Работа с данными -------------
-def format_profile(data: dict) -> str:
-
-    c_user_id = data.get("id")
-
-    c_user_photo = data.get("photo")
-    c_user_name = data.get("username")
-    c_user_age = data.get("age")
-    c_user_course = data.get("course")
-    c_user_city = data.get("city")
-    c_user_university = data.get("university")
-    c_user_bio = data.get("bio")
-
-    return (
-        f"👤 Профиль\n"
-        f"Фото: ебать ты урод\n"          # пока так, потом можно менять
-        f"Имя: {c_user_name}\n"
-        f"Возраст: {c_user_age}\n"
-        f"Курс: {c_user_course}\n"
-        f"Город: {c_user_city}\n"
-        f"Университет: {c_user_university}\n"
-        f"О себе: {c_user_bio}"
-    )
-
 
 
 
