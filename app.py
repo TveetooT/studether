@@ -69,29 +69,35 @@ dp = Dispatcher()
 
 # ---------- Обработчики команд ----------
 Phrases = {
-    "FirstNameMessage": "👋 Привет! Я робот хD.\n Давай найдем для тебя \n сожителя, с которым ты будешь вместе снимать жилье 🏠. \n Как тебя зовут?"
+    "FirstNameMessage": "👋 Привет! Я робот хD.\n Давай найдем для тебя \n сожителя, с которым ты будешь вместе снимать жилье 🏠. \n Как тебя зовут?",
+    "AgeMessage": "Возраст",
+    "YearMessage": "Год обучения", #Если магистратура/аспирантура то год обучения от первого курса
+    "CityMessage": "Город", 
+    "UniverMessage": "Вуз",
+    "AboutMessage": "О себе",
+    "RequirementsMessage": "Требования к соседу",
+    "Message": "Проверь свою анкету", #Выводу анкету после этого
 }
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    userid = message.from_user.id
-    await asyncio.to_thread(new_user_sync, userid)
+    user_id = message.from_user.id
+    await asyncio.to_thread(new_user_sync, user_id)
     await message.answer(Phrases['FirstNameMessage'])
-    await set_string_field(userid, "action", "firstname")
+    await set_string_field(user_id, "action", "firstname")
 
 @dp.message(Command("profile"))
 async def cmd_profile(message: types.Message):
     user_id = message.from_user.id
-    data = await asyncio.to_thread(get_user_sync, user_id)
-    if data:
-        text = format_profile(data)
+    text = get_profile(user_id)
+    if text != None:
+        await message.answer(text)
     else:
-        text = "Профиль не найден"
-    await message.answer(text)
+        message.answer("Профиль не существует")
 
 @dp.message(Command("test"))
 async def cmd_test(message: types.Message):
-    userid = message.from_user.id
+    user_id = message.from_user.id
     await message.answer("Тест")
 
 @dp.message(F.text & ~F.text.startswith('/'))
@@ -123,6 +129,11 @@ async def handle_text(message: types.Message):
         await set_string_field(user_id, "about", text)
         await message.answer(Phrases['RequirementsMessage'])
         await set_string_field(user_id, "action", "requirements")
+    if action == "requirements":
+        await set_string_field(user_id, "requirements", text)
+        await message.answer(Phrases['FormConfirm'])                
+        await cmd_profile(message)
+        await set_string_field(user_id, "action", "Confirm")
           
 
 
@@ -160,11 +171,11 @@ def create_app():
 if __name__ == "__main__":
     app = create_app()
     port = int(os.environ.get("PORT", 5000))
-    logger.info(f"Сервер запущен на порту {port}")
+    logger.info(f"Сервер запущен на порту {port}") 
     # Запускаем aiohttp-сервер (он сам создаст и управляет циклом событий)
     web.run_app(app, host="0.0.0.0", port=port)
 
-#-----------работа с данными-------------
+# ----------- Работа с данными -------------
 def format_profile(data: dict) -> str:
 
     c_user_id = data.get("id")
@@ -188,6 +199,14 @@ def format_profile(data: dict) -> str:
         f"О себе: {c_user_bio}"
     )
 
+# ----------- Выводим профиль -----------
+async def get_profile(user_id: int):
+    data = await asyncio.to_thread(get_user_sync, user_id)
+    if data:
+        text = format_profile(data)
+    else:
+        text = None
+    return text
 
 
 
