@@ -9,6 +9,8 @@ from aiogram import F
 from supabase import create_client
 from aiogram.types import BotCommand
 from aiogram import Bot
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 # ---------- Логирование ----------
 logging.basicConfig(level=logging.INFO)
@@ -73,7 +75,7 @@ async def get_profile(user_id: int):
         text = None
     return text
 
-# ----------- Выводим профиль -----------
+# ----------- Меню команд -----------
 async def set_commands(bot: Bot):
     commands = [
         BotCommand(command="start", description="Запустить бота"),
