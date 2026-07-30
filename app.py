@@ -76,7 +76,7 @@ Phrases = {
     "UniverMessage": "Вуз",
     "AboutMessage": "О себе",
     "RequirementsMessage": "Требования к соседу",
-    "Message": "Проверь свою анкету", #Выводу анкету после этого
+    "FormConfirm": "Проверь свою анкету", #Выводу анкету после этого
 }
 
 @dp.message(Command("start"))
@@ -132,7 +132,7 @@ async def handle_text(message: types.Message):
     if action == "requirements":
         await set_string_field(user_id, "requirements", text)
         await message.answer(Phrases['FormConfirm'])                
-        await cmd_profile(message)
+        await message.answer(get_profile(user_id))
         await set_string_field(user_id, "action", "Confirm")
           
 
