@@ -77,12 +77,12 @@ async def format_profile(data: dict) -> str:
     c_user_id = data.get("id")
 
     c_user_photo = data.get("photo")
-    c_user_name = data.get("username")
+    c_user_name = data.get("firstname")
     c_user_age = data.get("age")
-    c_user_course = data.get("course")
+    c_user_course = data.get("year")
     c_user_city = data.get("city")
-    c_user_university = data.get("university")
-    c_user_bio = data.get("bio")
+    c_user_university = data.get("univer")
+    c_user_bio = data.get("about")
 
     return (
         f"👤 Профиль\n"
