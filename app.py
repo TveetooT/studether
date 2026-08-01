@@ -28,6 +28,8 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("SUPABASE_URL и SUPABASE_KEY должны быть заданы")
 
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
+
 # ---------- Словари ----------
 Phrases = {
     "StartMessage": "👋 Привет! Я робот хD.\nДавай найдем для тебя \nдруга, с которым ты будешь вместе снимать жилье 🏠.\nНачни заполнять анкету в /form",
@@ -46,11 +48,15 @@ Phrases = {
     "UniverMessage2": "Вуз",
     "AboutMessage2": "О себе",
     "RequirementsMessage2": "Требования к соседу",
+    "FormSaved": "", 
+    "Menu": "",
 }
 
-Buttons = {
-    "ConfirmForm": "",
-    "RestartForm": ""
+Buttons = { #В названии переменной сначала идёт клавиатура к которой привязана кнопка, потом действие
+    "MainProfile": "",
+    "MainFind": "",
+    "FormConfirm": "Всё хорошо",
+    "FormRestart": "Заполнить заново",
 }
 
 # ---------- Подключение к БД ----------
@@ -96,6 +102,10 @@ async def get_profile(user_id: int):
         text = None
     return text
 
+# ----------- Возращаемся в меню -----------
+async def print_menu(message: types.Message):
+    message.answer(Phrases["Menu"], reply_markup=MainMenuKeyboard)
+
 # ----------- Старт анкеты -----------
 async def start_form(message: types.Message, user_id: int):
     await message.answer(Phrases['FirstNameMessage1'])
@@ -120,10 +130,10 @@ MainReplyKeyboardBuilder.button(text=Buttons["Profile"])
 MainReplyKeyboardBuilder.button(text=Buttons["Find"])
 MainReplyKeyboardBuilder.adjust(1, 2) #Ряды, столбцы
 MainMenuKeyboard = MainReplyKeyboardBuilder.as_markup(resize_keyboard=True)
-
+# ---------- Клавиатура в конце анкеты ----------
 FormConfirmKeyboardBuilder = ReplyKeyboardBuilder()
-FormConfirmKeyboardBuilder.button(text=Buttons["ConfirmForm"])
-FormConfirmKeyboardBuilder.button(text=Buttons["RestartForm"])
+FormConfirmKeyboardBuilder.button(text=Buttons["FormConfirm"])
+FormConfirmKeyboardBuilder.button(text=Buttons["FormRestart"])
 FormConfirmKeyboardBuilder.adjust(1, 2)
 FormConfirmKeyboard = FormConfirmKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 # ----------- Работа с данными -------------
@@ -227,51 +237,42 @@ async def handle_text(message: types.Message):
         await set_string_field(user_id, "action", "confirm")
     if action == "confirm":
         await set_string_field(user_id, "form", "true")
-        if text == Buttons["RestartForm"]:
+        await set_string_field(user_id , "action", "None")
+        if text == Buttons["FormRestart"]:
             await cmd_form()
+        if text == Buttons["FormConfirm"]:
+            await message.answer(Phrases["FormSaved"])
+            await print_menu(message)
           
 
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
 async def on_startup(app: web.Application):
-    webhook_url = "https://studether.onrender.com/webhook"
-    
-    # Удаляем старый вебхук на всякий случай
+    webhook_url = WEBHOOK_URL
     await bot.delete_webhook()
     await bot.set_webhook(webhook_url)
     await set_commands(bot) 
-
-    logger.info(f"Вебхук установлен на {webhook_url}")
 
 
 # ---------- Создание aiohttp-приложения ----------
 def create_app():
     app = web.Application()
-
-    # Эндпоинты для пинга (проверки здоровья)
     async def health(request):
         return web.Response(text="OK", status=200)
     app.router.add_get("/", health)
     app.router.add_get("/health", health)
-
-    # Регистрируем вебхук-обработчик от aiogram
     webhook_requests = aiohttp_server.SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
     )
     webhook_requests.register(app, path="/webhook")
-
-    # Регистрируем функцию, которая выполнится при старте сервера
     app.on_startup.append(on_startup)
-
     return app
 
 # ---------- Точка входа ----------
 if __name__ == "__main__":
     app = create_app()
     port = int(os.environ.get("PORT", 5000))
-    logger.info(f"Сервер запущен на порту {port}") 
-    # Запускаем aiohttp-сервер (он сам создаст и управляет циклом событий)
     web.run_app(app, host="0.0.0.0", port=port)
 
 
