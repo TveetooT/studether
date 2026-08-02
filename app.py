@@ -5,7 +5,7 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import (
-    BotCommand,                          # 👈 добавил
+    BotCommand,                          
     InlineKeyboardMarkup, InlineKeyboardButton,
     CallbackQuery,
     ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
@@ -30,6 +30,10 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
+
+# ---------- Константы ----------
+BOT_NAME = "Studether"
+
 # ---------- Списки ----------
 Actions = [
     "firstname", "age", "year", "city", "univer", "about", "requirements", "confirm"
@@ -39,28 +43,27 @@ Actions = [
 Phrases = {
     "StartMessage": "👋 Привет! Я робот хD.\nДавай найдем для тебя \nдруга, с которым ты будешь вместе снимать жилье 🏠.\nНачни заполнять анкету в /form",
 
-    "firstnameMessage1": "Как тебя зовут?",
-    "ageMessage1": "Сколько тебе лет?",
-    "yearMessage1": "Как долго ты уже учишься в Вузе(в годах)?", #Если магистратура/аспирантура то год обучения от первого курса
-    "cityMessage1": "В каком городе ты хочешь найти сожителя", 
-    "univerMessage1": "Как называется твой ВУЗ?",
-    "aboutMessage1": "Расскажи о себе, что тебе нравится, в чем у тебя все успешно получается.",
-    "requirementsMessage1": "Что требуешь от соседа?",
+    "firstnameMessage1": "Имя, отображаемое в анкете",
+    "ageMessage1": "Возраст, отображаемый в анкете",
+    "yearMessage1": "Курс, отображаемый в анкете\nЕсли ты закончил бакалавриат и учишься в аспирантуре или т.п., укажи общее количество учебных лет.\nЕсли сейчас лето, укажи, на какой курс ты переходишь.",
+    "cityMessage1": "Город, используемый для поиска",
+    "univerMessage1": "Учебное заведение, отображаемое в профиле",
+    "aboutMessage1": "Описание профиля",
+    "requirementsMessage1": "Пожелания, отображаемые после описания профиля",
 
-    "firstnameMessage2": "Как тебя зовут?",
-    "ageMessage2": "Возраст",
-    "yearMessage2": "Год обучения",
-    "cityMessage2": "Город", 
-    "univerMessage2": "Вуз",
-    "aboutMessage2": "О себе",
-    "requirementsMessage2": "Требования к соседу",
+    "firstnameMessage2": f"Меня зовут Studether. А под каким именем ты хочешь быть видимым для других людей?",
+    "ageMessage2": "Сколько тебе лет?",
+    "yearMessage2": "Гораздо веселее будет жить со студентами того же курса! На каком курсе ты сейчас?",
+    "cityMessage2": "В каком городе ты собираешься снимать квартиру?",
+    "univerMessage2": "Выбери учебное заведение, в котором ты учишься",
+    "aboutMessage2": "Добавь информацию к анкете. Можешь рассказать о себе или о том, какую квартиру ищешь. Что бы ты сам(а) хотел(а) знать о своём будущем соседе?",
+    "requirementsMessage2": "Очень чистоплотен/чистоплотна, или наоборот наплевать, сколько носков валяется на полу? Жить вдвоём или целой казармой? Хочешь соседа, с которым интересно поговорить, или перекидываться взглядами раз в день? Расскажи, каким/какой бы ты хотел(а) видеть будущего соседа.",
 
-    "confirmMessage1": "Проверь свою анкету", #Выводу анкету после этого
-    "confirmMessage2": "", #заглушка для form_question
-
-
-    "FormSaved": "", 
-    "Menu": "",
+    "confirmMessage1": "✅ Проверь свою анкету",
+    "confirmMessage2": ".",
+    
+    "FormSaved": "Анкета сохранена! Теперь ты можешь искать соседей через /find.",
+    "Menu": "Выбери действие в меню ниже:",
 }
 
 Buttons = { #В названии переменной сначала идёт клавиатура к которой привязана кнопка, потом действие
@@ -132,7 +135,6 @@ async def form_question(message: types.Message):
     user_id = message.from_user.id
     action = await get_field(user_id, "action")
     await set_string_field(user_id, action, text)
-
     if await get_field(user_id, "form") != "true":
         await message.answer(Phrases[NextAction[action]+"Message2"])
     await message.answer(Phrases[NextAction[action]+"Message1"])
