@@ -61,9 +61,9 @@ Phrases = {
 
     "confirmMessage1": "✅ Проверь свою анкету",
     "confirmMessage2": ".",
-    
+
     "FormSaved": "Анкета сохранена! Теперь ты можешь искать соседей через /find.",
-    "Menu": "Выбери действие в меню ниже:",
+    "Menu": "Ты в меню. Выбери действие на клавиатуре",
 }
 
 Buttons = { #В названии переменной сначала идёт клавиатура к которой привязана кнопка, потом действие
@@ -82,12 +82,19 @@ NextAction = {
     "about": "requirements",
     "requirements": "confirm",
 }
+
+CommandMenu = {
+    "start": "Запустить бота",
+    "profile": "Вывести анкету",
+    "form": "Заполнить анкету",
+    "menu": "Меню",
+}
 # ---------- Reply Клавиатуры ----------
 # ---------- Главная клавиатура ----------
 MainReplyKeyboardBuilder = ReplyKeyboardBuilder()
 MainReplyKeyboardBuilder.button(text=Buttons["MainProfile"])
 MainReplyKeyboardBuilder.button(text=Buttons["MainFind"])
-MainReplyKeyboardBuilder.adjust(1, 2) #Ряды, столбцы
+MainReplyKeyboardBuilder.adjust(1, 2) #Столбцы, ряды
 MainMenuKeyboard = MainReplyKeyboardBuilder.as_markup(resize_keyboard=True)
 # ---------- Клавиатура в конце анкеты ----------
 FormConfirmKeyboardBuilder = ReplyKeyboardBuilder()
@@ -136,7 +143,7 @@ async def form_question(message: types.Message):
     action = await get_field(user_id, "action")
     await set_string_field(user_id, action, text)
     if await get_field(user_id, "form") != "true":
-        await message.answer(Phrases[NextAction[action]+"Message2"])
+        await message.answer([NextAction[action]+"Message2"])
     await message.answer(Phrases[NextAction[action]+"Message1"])
     await set_string_field(user_id, "action", NextAction[action])
     if NextAction[action] == "confirm":
@@ -164,12 +171,9 @@ async def start_form(message: types.Message, user_id: int):
 
 # ----------- Меню команд -----------
 async def set_commands(bot: Bot):
-    commands = [
-        BotCommand(command="start", description="Запустить бота"),
-        BotCommand(command="help", description="Получить помощь"),
-        BotCommand(command="profile", description="Мой профиль"),
-        BotCommand(command="find", description="Найти сожителя"),
-    ]
+    commands = []
+    for command in CommandMenu:
+        commands.append(BotCommand(command=command, description=CommandMenu[command]))
     await bot.set_my_commands(commands)
 
 # ----------- Работа с данными -------------
@@ -236,6 +240,10 @@ async def cmd_text(message: types.Message):
                 await print_menu(message)
             return
         await form_question(message)
+
+@dp.message(Command("menu"))
+async def cmd_menu(message: types.Message):
+    print_menu(message)
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
 async def on_startup(app: web.Application):
