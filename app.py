@@ -30,27 +30,34 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
+# ---------- Списки ----------
+Actions = [
+    "firstname", "age", "year", "city", "univer", "about", "requirements", "confirm"
+]
+
 # ---------- Словари ----------
 Phrases = {
     "StartMessage": "👋 Привет! Я робот хD.\nДавай найдем для тебя \nдруга, с которым ты будешь вместе снимать жилье 🏠.\nНачни заполнять анкету в /form",
 
-    "FirstNameMessage1": "Как тебя зовут?",
-    "AgeMessage1": "Сколько тебе лет?",
-    "YearMessage1": "Как долго ты уже учишься в Вузе(в годах)?", #Если магистратура/аспирантура то год обучения от первого курса
-    "CityMessage1": "В каком городе ты хочешь найти сожителя", 
-    "UniverMessage1": "Как называется твой ВУЗ?",
-    "AboutMessage1": "Расскажи о себе, что тебе нравится, в чем у тебя все успешно получается.",
-    "RequirementsMessage1": "Что требуешь от соседа?",
+    "firstnameMessage1": "Как тебя зовут?",
+    "ageMessage1": "Сколько тебе лет?",
+    "yearMessage1": "Как долго ты уже учишься в Вузе(в годах)?", #Если магистратура/аспирантура то год обучения от первого курса
+    "cityMessage1": "В каком городе ты хочешь найти сожителя", 
+    "univerMessage1": "Как называется твой ВУЗ?",
+    "aboutMessage1": "Расскажи о себе, что тебе нравится, в чем у тебя все успешно получается.",
+    "requirementsMessage1": "Что требуешь от соседа?",
 
-    "FirstNameMessage2": "Как тебя зовут?",
-    "AgeMessage2": "Возраст",
-    "YearMessage2": "Год обучения",
-    "CityMessage2": "Город", 
-    "UniverMessage2": "Вуз",
-    "AboutMessage2": "О себе",
-    "RequirementsMessage2": "Требования к соседу",
+    "firstnameMessage2": "Как тебя зовут?",
+    "ageMessage2": "Возраст",
+    "yearMessage2": "Год обучения",
+    "cityMessage2": "Город", 
+    "univerMessage2": "Вуз",
+    "aboutMessage2": "О себе",
+    "requirementsMessage2": "Требования к соседу",
 
-    "FormConfirm": "Проверь свою анкету", #Выводу анкету после этого
+    "confirmMessage1": "Проверь свою анкету", #Выводу анкету после этого
+    "confirmMessage2": "", #заглушка для form_question
+
 
     "FormSaved": "", 
     "Menu": "",
@@ -65,12 +72,25 @@ Buttons = { #В названии переменной сначала идёт к
 
 NextAction = { 
     "firstname": "age",
-    "age": "yead",
+    "age": "year",
     "year": "city",
     "city": "univer",
     "univer": "about",
     "requirements": "confirm",
 }
+# ---------- Reply Клавиатуры ----------
+# ---------- Главная клавиатура ----------
+MainReplyKeyboardBuilder = ReplyKeyboardBuilder()
+MainReplyKeyboardBuilder.button(text=Buttons["MainProfile"])
+MainReplyKeyboardBuilder.button(text=Buttons["MainFind"])
+MainReplyKeyboardBuilder.adjust(1, 2) #Ряды, столбцы
+MainMenuKeyboard = MainReplyKeyboardBuilder.as_markup(resize_keyboard=True)
+# ---------- Клавиатура в конце анкеты ----------
+FormConfirmKeyboardBuilder = ReplyKeyboardBuilder()
+FormConfirmKeyboardBuilder.button(text=Buttons["FormConfirm"])
+FormConfirmKeyboardBuilder.button(text=Buttons["FormRestart"])
+FormConfirmKeyboardBuilder.adjust(1, 2)
+FormConfirmKeyboard = FormConfirmKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 # ---------- Подключение к БД ----------
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -111,17 +131,13 @@ async def form_question(message: types.Message):
     user_id = message.from_user.id
     action = await get_field(user_id, "action")
     await set_string_field(user_id, action, text)
-    if await get_field(user_id, "form") != "true":
-        await message.answer(Phrases[NextAction["action"]+"Message2"])
-    await message.answer(Phrases[NextAction["action"]+"Message1"])
-    await set_int_field(user_id, "action", NextAction["action"])
 
- #   if action == "firstname":
- #       await set_string_field(user_id, "firstname", text)
- #       if await get_field(user_id, "form") != "true":
- #           await message.answer(Phrases['AgeMessage2'])
- #       await message.answer(Phrases['AgeMessage1'])
- #       await set_int_field(user_id, "action", "age")
+    if await get_field(user_id, "form") != "true":
+        await message.answer(Phrases[NextAction[action]+"Message2"])
+    await message.answer(Phrases[NextAction[action]+"Message1"])
+    await set_string_field(user_id, "action", NextAction[action])
+    if NextAction[action] == "confirm":
+        await message.answer("", reply_markup=FormConfirmKeyboard)
     
 # ----------- Выводим профиль -----------
 async def get_profile(user_id: int):
@@ -134,13 +150,13 @@ async def get_profile(user_id: int):
 
 # ----------- Возращаемся в меню -----------
 async def print_menu(message: types.Message):
-    message.answer(Phrases["Menu"], reply_markup=MainMenuKeyboard)
+    await message.answer(Phrases["Menu"], reply_markup=MainMenuKeyboard)
 
 # ----------- Старт анкеты -----------
 async def start_form(message: types.Message, user_id: int):
-    await message.answer(Phrases['FirstNameMessage1'])
+    await message.answer(Phrases['firstnameMessage1'])
     if await get_field(user_id, "form") != "true":
-        await message.answer(Phrases['FirstNameMessage2'])
+        await message.answer(Phrases['firstnameMessage2'])
     await set_string_field(user_id, "action", "firstname")
 
 # ----------- Меню команд -----------
@@ -153,19 +169,6 @@ async def set_commands(bot: Bot):
     ]
     await bot.set_my_commands(commands)
 
-# ---------- Reply Клавиатуры ----------
-# ---------- Главная клавиатура ----------
-MainReplyKeyboardBuilder = ReplyKeyboardBuilder()
-MainReplyKeyboardBuilder.button(text=Buttons["Profile"])
-MainReplyKeyboardBuilder.button(text=Buttons["Find"])
-MainReplyKeyboardBuilder.adjust(1, 2) #Ряды, столбцы
-MainMenuKeyboard = MainReplyKeyboardBuilder.as_markup(resize_keyboard=True)
-# ---------- Клавиатура в конце анкеты ----------
-FormConfirmKeyboardBuilder = ReplyKeyboardBuilder()
-FormConfirmKeyboardBuilder.button(text=Buttons["FormConfirm"])
-FormConfirmKeyboardBuilder.button(text=Buttons["FormRestart"])
-FormConfirmKeyboardBuilder.adjust(1, 2)
-FormConfirmKeyboard = FormConfirmKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 # ----------- Работа с данными -------------
 async def format_profile(data: dict) -> str:
 
@@ -194,11 +197,6 @@ async def format_profile(data: dict) -> str:
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-@dp.message(Command("test"))
-async def cmd_test(message: types.Message):
-    user_id = message.from_user.id
-    await message.answer("Тест")
-
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
@@ -212,7 +210,7 @@ async def cmd_profile(message: types.Message):
     if text != None:
         await message.answer(text)
     else:
-        message.answer("Профиль не существует")
+        await message.answer("Профиль не существует")
 
 @dp.message(Command("form"))
 async def cmd_form(message: types.Message):
@@ -220,61 +218,21 @@ async def cmd_form(message: types.Message):
     await start_form(message, user_id)
 
 @dp.message(F.text & ~F.text.startswith('/'))
-async def handle_text(message: types.Message):
+async def cmd_text(message: types.Message):
     text = message.text
     user_id = message.from_user.id
     action = await get_field(user_id, "action")     
-    if action == "firstname":
-        await set_string_field(user_id, "firstname", text)
-        if await get_field(user_id, "form") != "true":
-            await message.answer(Phrases['AgeMessage2'])
-        await message.answer(Phrases['AgeMessage1'])
-        await set_int_field(user_id, "action", "age")
-    if action == "age":
-        await set_string_field(user_id, "age", text)
-        if await get_field(user_id, "form") != "true":
-            await message.answer(Phrases['YearMessage2'])
-        await message.answer(Phrases['YearMessage1'])
-        await set_int_field(user_id, "action", "year")
-    if action == "year":
-        await set_string_field(user_id, "year", text)
-        if await get_field(user_id, "form") != "true":
-            await message.answer(Phrases['CityMessage2'])
-        await message.answer(Phrases['CityMessage1'])
-        await set_string_field(user_id, "action", "city")
-    if action == "city":
-        await set_string_field(user_id, "city", text)
-        if await get_field(user_id, "form") != "true":
-            await message.answer(Phrases['UniverMessage2'])
-        await message.answer(Phrases['UniverMessage1'])
-        await set_string_field(user_id, "action", "univer")
-    if action == "univer":
-        await set_string_field(user_id, "univer", text)
-        if await get_field(user_id, "form") != "true":
-            await message.answer(Phrases['AboutMessage2'])
-        await message.answer(Phrases['AboutMessage1'])
-        await set_string_field(user_id, "action", "about")
-    if action == "about":
-        await set_string_field(user_id, "about", text)
-        if await get_field(user_id, "form") != "true":
-            await message.answer(Phrases['RequirementsMessage2'])
-        await message.answer(Phrases['RequirementsMessage1'])
-        await set_string_field(user_id, "action", "requirements")
-    if action == "requirements":
-        await set_string_field(user_id, "requirements", text)
-        await message.answer(Phrases['FormConfirm'])
-        await message.answer(await get_profile(user_id))
-        await set_string_field(user_id, "action", "confirm")
-    if action == "confirm":
-        await set_string_field(user_id, "form", "true")
-        await set_string_field(user_id , "action", "None")
-        if text == Buttons["FormRestart"]:
-            await cmd_form()
-        if text == Buttons["FormConfirm"]:
-            await message.answer(Phrases["FormSaved"])
-            await print_menu(message)
-          
-
+    if action in Actions:    
+        if action == "confirm":
+            await set_string_field(user_id, "form", "true")
+            await set_string_field(user_id , "action", "None")
+            if text == Buttons["FormRestart"]:
+                await cmd_form(message)
+            if text == Buttons["FormConfirm"]:
+                await message.answer(Phrases["FormSaved"])
+                await print_menu(message)
+            return
+        await form_question(message)
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
 async def on_startup(app: web.Application):
@@ -304,19 +262,3 @@ if __name__ == "__main__":
     app = create_app()
     port = int(os.environ.get("PORT", 5000))
     web.run_app(app, host="0.0.0.0", port=port)
-
-
-
-
-
-
-
-
-
-    
-
-
-
-
-
-
