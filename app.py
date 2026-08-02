@@ -33,6 +33,7 @@ WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 # ---------- Словари ----------
 Phrases = {
     "StartMessage": "👋 Привет! Я робот хD.\nДавай найдем для тебя \nдруга, с которым ты будешь вместе снимать жилье 🏠.\nНачни заполнять анкету в /form",
+
     "FirstNameMessage1": "Как тебя зовут?",
     "AgeMessage1": "Сколько тебе лет?",
     "YearMessage1": "Как долго ты уже учишься в Вузе(в годах)?", #Если магистратура/аспирантура то год обучения от первого курса
@@ -40,7 +41,7 @@ Phrases = {
     "UniverMessage1": "Как называется твой ВУЗ?",
     "AboutMessage1": "Расскажи о себе, что тебе нравится, в чем у тебя все успешно получается.",
     "RequirementsMessage1": "Что требуешь от соседа?",
-    "FormConfirm": "Проверь свою анкету", #Выводу анкету после этого
+
     "FirstNameMessage2": "Как тебя зовут?",
     "AgeMessage2": "Возраст",
     "YearMessage2": "Год обучения",
@@ -48,6 +49,9 @@ Phrases = {
     "UniverMessage2": "Вуз",
     "AboutMessage2": "О себе",
     "RequirementsMessage2": "Требования к соседу",
+
+    "FormConfirm": "Проверь свою анкету", #Выводу анкету после этого
+
     "FormSaved": "", 
     "Menu": "",
 }
@@ -59,6 +63,14 @@ Buttons = { #В названии переменной сначала идёт к
     "FormRestart": "Заполнить заново",
 }
 
+NextAction = { 
+    "firstname": "age",
+    "age": "yead",
+    "year": "city",
+    "city": "univer",
+    "univer": "about",
+    "requirements": "confirm",
+}
 # ---------- Подключение к БД ----------
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -93,6 +105,24 @@ def get_user_sync(user_id: int) -> dict | None:
         return response.data[0]  # первая (и единственная) строка
     return None
 
+# ---------- Выводим и получаем вопрос в анкете ----------
+async def form_question(message: types.Message):
+    text = message.text
+    user_id = message.from_user.id
+    action = await get_field(user_id, "action")
+    await set_string_field(user_id, action, text)
+    if await get_field(user_id, "form") != "true":
+        await message.answer(Phrases[NextAction["action"]+"Message2"])
+    await message.answer(Phrases[NextAction["action"]+"Message1"])
+    await set_int_field(user_id, "action", NextAction["action"])
+
+ #   if action == "firstname":
+ #       await set_string_field(user_id, "firstname", text)
+ #       if await get_field(user_id, "form") != "true":
+ #           await message.answer(Phrases['AgeMessage2'])
+ #       await message.answer(Phrases['AgeMessage1'])
+ #       await set_int_field(user_id, "action", "age")
+    
 # ----------- Выводим профиль -----------
 async def get_profile(user_id: int):
     data = await asyncio.to_thread(get_user_sync, user_id)
