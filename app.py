@@ -138,7 +138,7 @@ async def form_question(message: types.Message):
     await message.answer(Phrases[NextAction[action]+"Message1"])
     await set_string_field(user_id, "action", NextAction[action])
     if NextAction[action] == "confirm":
-        await message.answer(get_profile(user_id), reply_markup=FormConfirmKeyboard)
+        await message.answer(await get_profile(user_id), reply_markup=FormConfirmKeyboard)
     
 # ----------- Выводим профиль -----------
 async def get_profile(user_id: int):
