@@ -76,6 +76,7 @@ NextAction = {
     "year": "city",
     "city": "univer",
     "univer": "about",
+    "about": "requirements",
     "requirements": "confirm",
 }
 # ---------- Reply Клавиатуры ----------
