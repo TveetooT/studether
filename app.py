@@ -525,23 +525,24 @@ FormConfirmKeyboard = FormConfirmKeyboardBuilder.as_markup(resize_keyboard=True,
 # ---------- Inline Клавиатуры ----------
 # ---------- Выбор региона ----------
 RegionInlineKeyboardBuilder = InlineKeyboardBuilder()
-for region in Regions:
-    RegionInlineKeyboardBuilder.button(text=region, callback_data=region)
-RegionInlineKeyboardBuilder.adjust(1) #1 кнопка в ряду
+region_keys = list(Regions.keys())  
+for idx, region in enumerate(region_keys):
+    RegionInlineKeyboardBuilder.button(
+        text=region,
+        callback_data=f"reg_{idx}"  
+    )
+RegionInlineKeyboardBuilder.adjust(1)
 RegionInlineKeyboard = RegionInlineKeyboardBuilder.as_markup()
-# ---------- Выбор города ----------
-Cities = {
-#   "Омская облать" = Inline Клавиатура выводящая список городов этого региона
-}
-for region in Regions:
-    Cities[region] = InlineKeyboardBuilder()
-    for city in Regions[region]:
-        Cities[region].button(text=city, callback_data=city)
-    Cities[region].adjust(1)
-    Cities[region] = Cities[region].as_markup()
-    
-    
 
+# ---------- Выбор города ----------
+Cities = {}
+for region in region_keys:
+    builder = InlineKeyboardBuilder()
+    for city in Regions[region]:
+        builder.button(text=city, callback_data=f"city_{city}")
+    builder.adjust(1)
+    Cities[region] = builder.as_markup()   
+    
 # ---------- Подключение к БД ----------
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -718,16 +719,25 @@ async def callback_query(callback: CallbackQuery):
     data = callback.data
     user_id = callback.from_user.id
     form = await get_field(user_id, "form")
-    if data in Regions: #Ищем среди регионов
-        await set_string_field(user_id, "region", data)
+    if data.startswith("reg_"): 
+        region_idx = int(data.split("_")[1])
+        region_name = list(Regions.keys())[region_idx]
+        await set_string_field(user_id, "region", region_name)
+        await set_string_field(user_id, "action", "city")
+        await callback.answer()
         if form != "true":
             await callback.message.answer(Phrases["cityMessage2"])
-        await callback.message.answer(Phrases["cityMessage1"], reply_markup=Cities[data])
-        await set_string_field(user_id, "action", "city")
-    elif any(data in region for region in Regions.values()): #Ищем среди городов
-        await set_string_field(user_id, "city", data)
-        await callback.message.answer(Phrases["confirmMessage"]+"\n"+ await get_profile(user_id), reply_markup=FormConfirmKeyboard)
+        await callback.message.answer(Phrases["cityMessage1"], reply_markup=Cities[region_name])
+    elif data.startswith("city_"):  
+        city_name = data[5:]  
+        await set_string_field(user_id, "city", city_name)
         await set_string_field(user_id, "action", "confirm")
+        await callback.answer()
+        profile_text = await get_profile(user_id)
+        await callback.message.answer(
+            Phrases["confirmMessage"] + "\n" + profile_text,
+            reply_markup=FormConfirmKeyboard
+        )
     callback.answer()
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
