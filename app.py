@@ -140,7 +140,7 @@ async def form_question(message: types.Message):
     action = await get_field(user_id, "action")
     await set_string_field(user_id, action, text)
     if await get_field(user_id, "form") != "true":
-        await message.answer(Phrases([NextAction[action]+"Message2"]))
+        await message.answer(Phrases[NextAction[action]+"Message2"])
     await message.answer(Phrases[NextAction[action]+"Message1"])
     await set_string_field(user_id, "action", NextAction[action])
     if NextAction[action] == "confirm":
