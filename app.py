@@ -36,7 +36,7 @@ BOT_NAME = "Studether"
 
 # ---------- Списки ----------
 Actions = [
-    "name", "age", "year", "city", "univer", "about", "requirements", "confirm"
+    "name", "age", "city", "univer", "about", "requirements", "confirm"
 ]
 
 # ---------- Словари ----------
@@ -45,7 +45,6 @@ Phrases = {
 
     "nameMessage1": "Имя, отображаемое в анкете",
     "ageMessage1": "Возраст, отображаемый в анкете",
-    "yearMessage1": "Курс, отображаемый в анкете\nЕсли ты закончил бакалавриат и учишься в аспирантуре или т.п., укажи общее количество учебных лет.\nЕсли сейчас лето, укажи, на какой курс ты переходишь.",
     "cityMessage1": "Город, используемый для поиска",
     "univerMessage1": "Учебное заведение, отображаемое в профиле",
     "aboutMessage1": "Описание профиля",
@@ -53,7 +52,6 @@ Phrases = {
 
     "nameMessage2": f"Меня зовут Studether. А под каким именем ты хочешь быть видимым для других людей?",
     "ageMessage2": "Сколько тебе лет?",
-    "yearMessage2": "Гораздо веселее будет жить со студентами того же курса! На каком курсе ты сейчас?",
     "cityMessage2": "В каком городе ты собираешься снимать квартиру?",
     "univerMessage2": "Выбери учебное заведение, в котором ты учишься",
     "aboutMessage2": "Добавь информацию к анкете. Можешь рассказать о себе или о том, какую квартиру ищешь. Что бы ты сам(а) хотел(а) знать о своём будущем соседе?",
@@ -75,8 +73,7 @@ Buttons = { #В названии переменной сначала идёт к
 
 NextAction = { 
     "name": "age",
-    "age": "year",
-    "year": "city",
+    "age": "city",
     "city": "univer",
     "univer": "about",
     "about": "requirements",
@@ -184,7 +181,6 @@ async def format_profile(data: dict) -> str:
     c_user_photo = data.get("photo")
     c_user_name = data.get("name")
     c_user_age = data.get("age")
-    c_user_course = data.get("year")
     c_user_city = data.get("city")
     c_user_university = data.get("univer")
     c_user_bio = data.get("about")
@@ -194,7 +190,6 @@ async def format_profile(data: dict) -> str:
         f"Фото: ебать ты \n"          # пока так, потом можно менять
         f"Имя: {c_user_name}\n"
         f"Возраст: {c_user_age}\n"
-        f"Курс: {c_user_course}\n"
         f"Город: {c_user_city}\n"
         f"Университет: {c_user_university}\n"
         f"О себе: {c_user_bio}"
