@@ -660,7 +660,7 @@ async def cmd_start(message: types.Message):
 async def cmd_profile(message: types.Message):
     user_id = message.from_user.id
     text = await get_profile(user_id)
-    if text != None:
+    if text is not None:
         await message.answer(text)
     else:
         await message.answer("Профиль не существует")
