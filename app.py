@@ -704,10 +704,10 @@ async def text(message: types.Message):
 # ---------- Принимаем сообщения ----------
 @dp.message()
 async def message(message: types.Message):
-    text = message.text
+    mtext = message.text
     user_id = message.from_user.id
     
-    if text and text[0] == "/":
+    if mtext and mtext[0] == "/":
         await command(message)
         return
     await text(message)
