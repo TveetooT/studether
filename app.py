@@ -518,7 +518,7 @@ MainMenuKeyboard = MainReplyKeyboardBuilder.as_markup(resize_keyboard=True)
 # ---------- Клавиатура в конце анкеты ----------
 FormConfirmKeyboardBuilder = ReplyKeyboardBuilder()
 for text in FormButtons:
-    MainReplyKeyboardBuilder.button(text=FormButtons[text])
+    FormConfirmKeyboardBuilder.button(text=FormButtons[text])
 FormConfirmKeyboardBuilder.adjust(1, 2)
 FormConfirmKeyboard = FormConfirmKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 
@@ -583,17 +583,18 @@ async def form_question(message: types.Message):
     text = message.text
     user_id = message.from_user.id
     action = await get_field(user_id, "action")
+    nextaction = NextAction[action]
     reply = None
     await set_string_field(user_id, action, text)
-    if NextAction[action] == "region":
+    if nextaction == "region":
         reply = RegionInlineKeyboard
-    if NextAction[action] == "city":
+    if nextaction == "city":
         reply = Cities[await get_field(user_id, "region")]
     if await get_field(user_id, "form") != "true": #Если проходим анкету впервые выводим приветливые сообщения
-        await message.answer(Phrases[NextAction[action]+"Message2"])
-    await message.answer(Phrases[NextAction[action]+"Message1"], reply_markup=reply)
-    await set_string_field(user_id, "action", NextAction[action])
-    if NextAction[action] == "confirm":
+        await message.answer(Phrases[nextaction+"Message2"])
+    await message.answer(Phrases[nextaction+"Message1"], reply_markup=reply)
+    await set_string_field(user_id, "action", nextaction)
+    if nextaction == "confirm":
         await message.answer(await get_profile(user_id), reply_markup=FormConfirmKeyboard)
     
 # ----------- Выводим профиль -----------
@@ -706,11 +707,10 @@ async def text(message: types.Message):
 async def message(message: types.Message):
     mtext = message.text
     user_id = message.from_user.id
-    
     if mtext and mtext[0] == "/":
         await command(message)
-        return
-    await text(message)
+    else:
+        await text(message)
 
 # ---------- Принимаем сигналы от Inline клавиатуры ----------
 @dp.callback_query()
@@ -728,6 +728,7 @@ async def callback_query(callback: CallbackQuery):
         await set_string_field(user_id, "city", data)
         await callback.message.answer(Phrases["confirmMessage"]+"\n"+ await get_profile(user_id), reply_markup=FormConfirmKeyboard)
         await set_string_field(user_id, "action", "confirm")
+    callback.answer()
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
 async def on_startup(app: web.Application):
