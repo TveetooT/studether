@@ -700,7 +700,7 @@ async def message(message: types.Message):
     text = message.text
     user_id = message.from_user.id
     
-    if text[0] == "/":
+    if text and text[0] == "/":
         await command(message)
         return
     await text(message)
@@ -714,27 +714,13 @@ async def callback_query(callback: CallbackQuery):
     if data in Regions: #Ищем среди регионов
         await set_string_field(user_id, "region", data)
         if form != "true":
-            await callback.answer(Phrases["cityMessage2"])
-        await callback.answer(Phrases["cityMessage1"], reply_markup=Cities[data])
+            await callback.message.answer(Phrases["cityMessage2"])
+        await callback.message.answer(Phrases["cityMessage1"], reply_markup=Cities[data])
         await set_string_field(user_id, "action", "city")
-    elif any(data in region for region in Regions.walues): #Ищем среди городов
+    elif any(data in region for region in Regions.values()): #Ищем среди городов
         await set_string_field(user_id, "city", data)
-        await message.answer(Phrases["confirmMessage"]+"\n"+ await get_profile(user_id), reply_markup=FormConfirmKeyboard)
-
-async def form_question(message: types.Message):
-    text = message.text
-    user_id = message.from_user.id
-    action = await get_field(user_id, "action")
-    reply = None
-    await set_string_field(user_id, action, text)
-    if NextAction[action] == "region":
-        reply = RegionInlineKeyboard
-    if NextAction[action] == "city":
-        reply = Cities[await get_field(user_id, "region")]
-    if await get_field(user_id, "form") != "true": #Если проходим анкету впервые выводим приветливые сообщения
-        await message.answer(Phrases[NextAction[action]+"Message2"])
-    await message.answer(Phrases[NextAction[action]+"Message1"], reply_markup=reply)
-    await set_string_field(user_id, "action", NextAction[action])
+        await callback.message.answer(Phrases["confirmMessage"]+"\n"+ await get_profile(user_id), reply_markup=FormConfirmKeyboard)
+        await set_string_field(user_id, "action", "confirm")
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
 async def on_startup(app: web.Application):
