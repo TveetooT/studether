@@ -36,14 +36,14 @@ BOT_NAME = "Studether"
 
 # ---------- Списки ----------
 Actions = [
-    "firstname", "age", "year", "city", "univer", "about", "requirements", "confirm"
+    "name", "age", "year", "city", "univer", "about", "requirements", "confirm"
 ]
 
 # ---------- Словари ----------
 Phrases = {
     "StartMessage": "👋 Привет! Я робот хD.\nДавай найдем для тебя \nдруга, с которым ты будешь вместе снимать жилье 🏠.\nНачни заполнять анкету в /form",
 
-    "firstnameMessage1": "Имя, отображаемое в анкете",
+    "nameMessage1": "Имя, отображаемое в анкете",
     "ageMessage1": "Возраст, отображаемый в анкете",
     "yearMessage1": "Курс, отображаемый в анкете\nЕсли ты закончил бакалавриат и учишься в аспирантуре или т.п., укажи общее количество учебных лет.\nЕсли сейчас лето, укажи, на какой курс ты переходишь.",
     "cityMessage1": "Город, используемый для поиска",
@@ -51,7 +51,7 @@ Phrases = {
     "aboutMessage1": "Описание профиля",
     "requirementsMessage1": "Пожелания, отображаемые после описания профиля",
 
-    "firstnameMessage2": f"Меня зовут Studether. А под каким именем ты хочешь быть видимым для других людей?",
+    "nameMessage2": f"Меня зовут Studether. А под каким именем ты хочешь быть видимым для других людей?",
     "ageMessage2": "Сколько тебе лет?",
     "yearMessage2": "Гораздо веселее будет жить со студентами того же курса! На каком курсе ты сейчас?",
     "cityMessage2": "В каком городе ты собираешься снимать квартиру?",
@@ -74,7 +74,7 @@ Buttons = { #В названии переменной сначала идёт к
 }
 
 NextAction = { 
-    "firstname": "age",
+    "name": "age",
     "age": "year",
     "year": "city",
     "city": "univer",
@@ -164,10 +164,10 @@ async def print_menu(message: types.Message):
 
 # ----------- Старт анкеты -----------
 async def start_form(message: types.Message, user_id: int):
-    await message.answer(Phrases['firstnameMessage1'])
+    await message.answer(Phrases['nameMessage1'])
     if await get_field(user_id, "form") != "true":
-        await message.answer(Phrases['firstnameMessage2'])
-    await set_string_field(user_id, "action", "firstname")
+        await message.answer(Phrases['nameMessage2'])
+    await set_string_field(user_id, "action", "name")
 
 # ----------- Меню команд -----------
 async def set_commands(bot: Bot):
@@ -182,7 +182,7 @@ async def format_profile(data: dict) -> str:
     c_user_id = data.get("id")
 
     c_user_photo = data.get("photo")
-    c_user_name = data.get("firstname")
+    c_user_name = data.get("name")
     c_user_age = data.get("age")
     c_user_course = data.get("year")
     c_user_city = data.get("city")
