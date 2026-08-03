@@ -62,16 +62,15 @@ Phrases = {
     "regionMessage2": "Для поиска нужно указать город, в котором ты собираешься снимать квартиру, но сначала укажи регион, в котором этот город находится",
     "cityMessage2": "В каком городе ты собираешься снимать квартиру?",
 
-    "confirmMessage1": "✅ Проверь свою анкету",
-    "confirmMessage2": ".",
+    "confirmMessage": "Проверь свою анкету",
 
     "FormSaved": "Анкета сохранена! Теперь ты можешь искать соседей через /find.",
     "Menu": "Ты в меню. Выбери действие на клавиатуре",
 }
 
 Buttons = { #В названии переменной сначала идёт клавиатура к которой привязана кнопка, потом действие
-    "MainProfile": "",
-    "MainFind": "",
+    "MainProfile": "👤 Мой профиль",
+    "MainFind": "🔍 Найти сожителя",
     "FormConfirm": "Всё хорошо",
     "FormRestart": "Заполнить заново",
 }
@@ -272,14 +271,14 @@ Regions = {
     ],
     "Калининградская область": [
         "Калининград", "Багратионовск", "Балтийск", "Гвардейск", "Гурьевск",
-        "Гусев", "Зеленоградск", "Краснознаменск", "Ладушкин", "Мамоново",
+        "Гусев", "Зеленоградск", "Краснознаменск_", "Ладушкин", "Мамоново",
         "Неман", "Нестеров", "Озёрск", "Пионерский", "Полесск",
         "Правдинск", "Приморск", "Светлогорск", "Светлый", "Славск",
         "Советск", "Черняховск"
     ],
     "Калужская область": [
         "Калуга", "Балабаново", "Белоусово", "Боровск", "Ермолино",
-        "Жиздра", "Жуков", "Киров", "Козельск", "Кондрово",
+        "Жиздра", "Жуков", "Киров_", "Козельск", "Кондрово",
         "Кремёнки", "Людиново", "Малоярославец", "Медынь", "Мещовск",
         "Мосальск", "Обнинск", "Сосенский", "Спас-Деменск", "Сухиничи",
         "Таруса", "Юхнов"
@@ -293,7 +292,7 @@ Regions = {
     "Кировская область": [
         "Киров", "Белая Холуница", "Вятские Поляны", "Зуевка", "Кирово-Чепецк",
         "Кирс", "Котельнич", "Луза", "Малмыж", "Мураши", "Нолинск",
-        "Омутнинск", "Орлов", "Слободской", "Советск", "Сосновка", "Уржум", "Яранск"
+        "Омутнинск", "Орлов", "Слободской", "Советск_", "Сосновка", "Уржум", "Яранск"
     ],
     "Костромская область": [
         "Кострома", "Буй", "Волгореченск", "Галич", "Кологрив", "Макарьев",
@@ -313,7 +312,7 @@ Regions = {
         "Высоцк", "Гатчина", "Ивангород", "Каменногорск", "Кингисепп",
         "Кириши", "Кировск", "Коммунар", "Кудрово", "Лодейное Поле",
         "Луга", "Любань", "Мурино", "Никольское", "Новая Ладога",
-        "Отрадное", "Пикалёво", "Подпорожье", "Приморск", "Приозерск",
+        "Отрадное", "Пикалёво", "Подпорожье", "Приморск_", "Приозерск",
         "Светогорск", "Сертолово", "Сланцы", "Сосновый Бор", "Тихвин",
         "Тосно", "Шлиссельбург"
     ],
@@ -444,7 +443,7 @@ Regions = {
     "Тульская область": [
         "Тула", "Алексин", "Белёв", "Богородицк", "Болохово",
         "Венёв", "Донской", "Ефремов", "Кимовск", "Киреевск",
-        "Липки", "Новомосковск", "Плавск", "Советск", "Суворов",
+        "Липки", "Новомосковск", "Плавск", "Советск__", "Суворов",
         "Узловая", "Чекалин", "Щёкино", "Ясногорск"
     ],
     "Тюменская область": [
@@ -486,7 +485,7 @@ Regions = {
     "Донецкая Народная Республика": [
         "Донецк", "Горловка", "Дебальцево", "Докучаевск", "Енакиево",
         "Ждановка", "Кировское", "Макеевка", "Мариуполь", "Снежное",
-        "Торез", "Углегорск", "Харцызск", "Шахтёрск", "Ясиноватая"
+        "Торез", "Углегорск_", "Харцызск", "Шахтёрск", "Ясиноватая"
     ],
     "Луганская Народная Республика": [
         "Луганск", "Алмазная", "Алчевск", "Антрацит", "Брянка",
@@ -562,7 +561,9 @@ async def get_field(user_id: int, field: str):
         .select(field)\
         .eq("user_id", user_id)\
         .execute()
-    return response.data[0][field]
+    if response.data:
+        return response.data[0][field]
+    return None
 
 def get_user_sync(user_id: int) -> dict | None:
     response = supabase.table("users").select("*").eq("user_id", user_id).execute()
@@ -658,6 +659,7 @@ async def cmd_profile(message: types.Message):
 
 async def cmd_form(message: types.Message):
     user_id = message.from_user.id
+    await asyncio.to_thread(new_user_sync, user_id)
     await start_form(message, user_id)
 
 async def cmd_menu(message: types.Message):
@@ -668,11 +670,11 @@ async def command(message: types.Message):
     text = message.text
     if text == "/start":
         await cmd_start(message)
-    if text == "/profile":
+    elif text == "/profile":
         await cmd_profile(message)
-    if text == "/form":
+    elif text == "/form":
         await cmd_form(message)
-    if text == "/menu":
+    elif text == "/menu":
         await cmd_menu(message)
 
 # ---------- Обработка сообщений ----------
@@ -697,11 +699,43 @@ async def text(message: types.Message):
 async def message(message: types.Message):
     text = message.text
     user_id = message.from_user.id
+    
     if text[0] == "/":
         await command(message)
         return
-    text(message)
-    
+    await text(message)
+
+# ---------- Принимаем сигналы от Inline клавиатуры ----------
+@dp.callback_query()
+async def callback_query(callback: CallbackQuery):
+    data = callback.data
+    user_id = callback.from_user.id
+    form = await get_field(user_id, "form")
+    if data in Regions: #Ищем среди регионов
+        await set_string_field(user_id, "region", data)
+        if form != "true":
+            await callback.answer(Phrases["cityMessage2"])
+        await callback.answer(Phrases["cityMessage1"], reply_markup=Cities[data])
+        await set_string_field(user_id, "action", "city")
+    elif any(data in region for region in Regions.walues): #Ищем среди городов
+        await set_string_field(user_id, "city", data)
+        await message.answer(Phrases["confirmMessage"]+"\n"+ await get_profile(user_id), reply_markup=FormConfirmKeyboard)
+
+async def form_question(message: types.Message):
+    text = message.text
+    user_id = message.from_user.id
+    action = await get_field(user_id, "action")
+    reply = None
+    await set_string_field(user_id, action, text)
+    if NextAction[action] == "region":
+        reply = RegionInlineKeyboard
+    if NextAction[action] == "city":
+        reply = Cities[await get_field(user_id, "region")]
+    if await get_field(user_id, "form") != "true": #Если проходим анкету впервые выводим приветливые сообщения
+        await message.answer(Phrases[NextAction[action]+"Message2"])
+    await message.answer(Phrases[NextAction[action]+"Message1"], reply_markup=reply)
+    await set_string_field(user_id, "action", NextAction[action])
+
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
 async def on_startup(app: web.Application):
     webhook_url = WEBHOOK_URL
