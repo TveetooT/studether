@@ -38,6 +38,7 @@ BOT_NAME = "Studether"
 Actions = [
     "name", "age", "univer", "about", "requirements", "confirm"
 ]
+
 InlineKeyboardActions = [
     "region", "city"
 ]
@@ -68,11 +69,17 @@ Phrases = {
     "Menu": "Ты в меню. Выбери действие на клавиатуре",
 }
 
-Buttons = { #В названии переменной сначала идёт клавиатура к которой привязана кнопка, потом действие
-    "MainProfile": "👤 Мой профиль",
-    "MainFind": "🔍 Найти сожителя",
-    "FormConfirm": "Всё хорошо",
-    "FormRestart": "Заполнить заново",
+# ---------- Кнопки ----------
+# ---------- главное меню ----------
+MainButtons = {
+    "Profile": "👤 Мой профиль",
+    "Find": "🔍 Найти сожителя",
+}
+
+# ---------- Подтверждение анкеты ----------
+FormButtons = { #В названии переменной сначала идёт клавиатура к которой привязана кнопка, потом действие
+    "Confirm": "Всё хорошо",
+    "Restart": "Заполнить заново",
 }
 
 NextAction = { 
@@ -504,14 +511,14 @@ Regions = {
 # ---------- Reply Клавиатуры ----------
 # ---------- Главная клавиатура ----------
 MainReplyKeyboardBuilder = ReplyKeyboardBuilder()
-MainReplyKeyboardBuilder.button(text=Buttons["MainProfile"])
-MainReplyKeyboardBuilder.button(text=Buttons["MainFind"])
+for text in MainButtons:
+    MainReplyKeyboardBuilder.button(text=MainButtons[text])
 MainReplyKeyboardBuilder.adjust(1, 2) #Столбцы, ряды
 MainMenuKeyboard = MainReplyKeyboardBuilder.as_markup(resize_keyboard=True)
 # ---------- Клавиатура в конце анкеты ----------
 FormConfirmKeyboardBuilder = ReplyKeyboardBuilder()
-FormConfirmKeyboardBuilder.button(text=Buttons["FormConfirm"])
-FormConfirmKeyboardBuilder.button(text=Buttons["FormRestart"])
+for text in FormButtons:
+    MainReplyKeyboardBuilder.button(text=FormButtons[text])
 FormConfirmKeyboardBuilder.adjust(1, 2)
 FormConfirmKeyboard = FormConfirmKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 
@@ -686,9 +693,9 @@ async def text(message: types.Message):
         if action == "confirm":
             await set_string_field(user_id, "form", "true")
             await set_string_field(user_id , "action", "None")
-            if text == Buttons["FormRestart"]:
+            if text == FormButtons["Restart"]:
                 await cmd_form(message)
-            if text == Buttons["FormConfirm"]:
+            if text == FormButtons["Confirm"]:
                 await message.answer(Phrases["FormSaved"])
                 await print_menu(message)
             return
