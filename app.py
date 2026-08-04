@@ -527,10 +527,7 @@ FormConfirmKeyboard = FormConfirmKeyboardBuilder.as_markup(resize_keyboard=True,
 RegionInlineKeyboardBuilder = InlineKeyboardBuilder()
 region_keys = list(Regions.keys())  
 for idx, region in enumerate(region_keys):
-    RegionInlineKeyboardBuilder.button(
-        text=region,
-        callback_data=f"reg_{idx}"  
-    )
+    RegionInlineKeyboardBuilder.button(text=region, callback_data=f"reg_{idx}" )
 RegionInlineKeyboardBuilder.adjust(1)
 RegionInlineKeyboard = RegionInlineKeyboardBuilder.as_markup()
 
@@ -674,6 +671,12 @@ async def cmd_form(message: types.Message):
 async def cmd_menu(message: types.Message):
      await print_menu(message)
 
+async def cmd_test(message: types.Message):
+    TestIKB = InlineKeyboardBuilder()
+    TestIKB.button(text="testText", callback_data="testCD")
+    TestIKB.adjust(1)
+    TestIK = TestIKB.as_markup()
+    await message.answer("TestAnswer", reply_markup=TestIK)
 # ----------- Обработка команд -------------
 async def command(message: types.Message):
     text = message.text
@@ -685,6 +688,8 @@ async def command(message: types.Message):
         await cmd_form(message)
     elif text == "/menu":
         await cmd_menu(message)
+    elif text == "/test":
+        await cmd_test(message)
 
 # ---------- Обработка сообщений ----------
 async def text(message: types.Message):
@@ -738,7 +743,9 @@ async def callback_query(callback: CallbackQuery):
             Phrases["confirmMessage"] + "\n" + profile_text,
             reply_markup=FormConfirmKeyboard
         )
-    callback.answer()
+    else:
+        await callback.answer()
+        bot.send_message(user_id, data)
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
 async def on_startup(app: web.Application):
