@@ -30,6 +30,8 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
+# ---------- Подключение к БД ----------
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ---------- Константы ----------
 BOT_NAME = "Studether"
@@ -540,9 +542,6 @@ for region in region_keys:
     builder.adjust(1)
     Cities[region] = builder.as_markup()   
     
-# ---------- Подключение к БД ----------
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
 # ---------- Функция для БД ----------
 def new_user_sync(user_id: int):
     response = supabase.table("users").upsert(
