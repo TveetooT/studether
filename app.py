@@ -550,25 +550,25 @@ def new_user_sync(user_id: int):
     ).execute()
 
 async def set_string_field(user_id: int, field: str, value: str):
-    response = supabase.table("users")\
-        .update({field: value})\
-        .eq("user_id", user_id)\
-        .execute()
+    def _update():
+        return supabase.table("users").update({field: value}).eq("user_id", user_id).execute()
+    await asyncio.to_thread(_update)
 
 async def set_int_field(user_id: int, field: str, value: int):
-    response = supabase.table("users")\
-        .update({field: value})\
-        .eq("user_id", user_id)\
-        .execute()
+    def _update():
+        return supabase.table("users").update({field: value}).eq("user_id", user_id).execute()
+    await asyncio.to_thread(_update)
 
 async def get_field(user_id: int, field: str):
-    response = supabase.table("users")\
-        .select(field)\
-        .eq("user_id", user_id)\
-        .execute()
-    if response.data:
-        return response.data[0][field]
-    return None
+    def _select():
+        return supabase.table("users").select(field).eq("user_id", user_id).execute()
+    try:
+        response = await asyncio.to_thread(_select)
+        if response.data:
+            return response.data[0][field]
+        return None
+    except Exception as e:
+        return None
 
 def get_user_sync(user_id: int) -> dict | None:
     response = supabase.table("users").select("*").eq("user_id", user_id).execute()
