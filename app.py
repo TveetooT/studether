@@ -745,7 +745,7 @@ async def callback_query(callback: CallbackQuery):
         )
     else:
         await callback.answer()
-        bot.send_message(user_id, data)
+        await bot.send_message(user_id, data)
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
 async def on_startup(app: web.Application):
