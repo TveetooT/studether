@@ -43,7 +43,7 @@ Actions = [
 ]
 
 ActionEdit = [
-    "name_editing", "age_editing", "univer_editing", "about_editing", "requirements_editing", "region_editing", "city_editing"
+    "nameEdit", "ageEdit", "univerEdit", "aboutEdit", "requirementsEdit", "regionEdit", "cityEdit"
 ]
 
 InlineKeyboardActions = [
@@ -634,12 +634,9 @@ async def form_edit(message: types.Message, action: str):
     user_id = message.from_user.id
     nextaction = NextAction[action]
     reply = None
-    if nextaction == "region":
-        reply = RegionInlineKeyboard
-    if nextaction == "city":
-        reply = Cities[await get_field(user_id, "region")]
-    await message.answer(Phrases[nextaction+"Message1"], reply_markup=reply)
-    await set_string_field(user_id, "action", nextaction)
+    text = message.text
+    await set_string_field(user_id, action, text)
+    await message.answer(get_profile(user_id), reply_markup=FormEditKeyboard)
 # ----------- Выводим профиль -----------
 async def get_profile(user_id: int):
     data = await asyncio.to_thread(get_user_sync, user_id)
@@ -719,9 +716,9 @@ async def command(message: types.Message):
     text = message.text
     if text == "/start":
         await cmd_start(message)
-    elif text == "/profile":
-        await cmd_form_edit(message)
     elif text == "/form":
+        await cmd_form_edit(message)
+    elif text == "/profile":
         await cmd_form(message)
     elif text == "/menu":
         await cmd_menu(message)
@@ -750,10 +747,13 @@ async def text(message: types.Message):
         await form_question(message)
     if action in ActionEdit:
         await form_edit(message, action)
-        await cmd_form_edit(message)
     if text == ReturnButton["Return"]:
         await set_string_field(user_id, "action", "None")
         await print_menu(message)
+    if text == MainButtons["Profile"]:
+        await cmd_form_edit(message)
+    if text == MainButtons["Find"]:
+        return
 
 # ---------- Консольные команды ----------
 async def cmd(message: types.Message):
@@ -806,10 +806,13 @@ async def callback_query(callback: CallbackQuery):
         profile_text = await get_profile(user_id)
         await callback.message.answer(Phrases["confirmMessage"] + "\n" + profile_text, reply_markup=FormConfirmKeyboard)
     elif data.startswith("edit_"):
-        field = data[5:]+"_editing"
-        await set_string_field(user_id, "action", field)
+        action = data[5:]
+        reply = None
+        if action in InlineKeyboardActions:
+            reply = InlineKeyboardActions[action]
+        await set_string_field(user_id, "action", action+"Edit")
+        await callback.message.answer(Phrases[action+"Message1"], reply_markup=reply)
         await callback.answer()
-        await callback.message.answer(Phrases[field+"Message1"], reply_markup=FormReturnKeyboard)
     else:
         await callback.answer()
         await bot.send_message(user_id, data)
