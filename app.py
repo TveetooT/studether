@@ -750,8 +750,9 @@ async def callback_query(callback: CallbackQuery):
 async def on_startup(app: web.Application):
     webhook_url = WEBHOOK_URL
     await bot.delete_webhook()
-    await bot.set_webhook(webhook_url)
+    await bot.set_webhook(WEBHOOK_URL,  allowed_updates=dp.resolve_used_update_types())
     await set_commands(bot) 
+    
 
 # ---------- Создание aiohttp-приложения ----------
 def create_app():
