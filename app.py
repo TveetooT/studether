@@ -632,8 +632,6 @@ async def form_question(message: types.Message):
 
 async def form_edit(message: types.Message, action: str):
     user_id = message.from_user.id
-    nextaction = NextAction[action]
-    reply = None
     text = message.text
     await set_string_field(user_id, action, text)
     await message.answer(get_profile(user_id), reply_markup=FormEditKeyboard)
@@ -697,7 +695,6 @@ async def cmd_form(message: types.Message):
 async def cmd_form_edit(message: types.Message):
     user_id = message.from_user.id
     await asyncio.to_thread(new_user_sync, user_id)
-
     await start_form(message, user_id)
     await set_string_field(user_id, "action", "form")
 
@@ -717,7 +714,7 @@ async def command(message: types.Message):
     if text == "/start":
         await cmd_start(message)
     elif text == "/form":
-        await cmd_form_edit(message)
+        await start_form(message, message.from_user.id)
     elif text == "/profile":
         await cmd_form(message)
     elif text == "/menu":
@@ -739,7 +736,7 @@ async def text(message: types.Message):
             await set_string_field(user_id, "form", "true")
             await set_string_field(user_id , "action", "None")
             if text == FormButtons["Restart"]:
-                await cmd_form(message)
+                await start_form(message, user_id)
             if text == FormButtons["Confirm"]:
                 await message.answer(Phrases["FormSaved"])
                 await print_menu(message)
@@ -751,7 +748,7 @@ async def text(message: types.Message):
         await set_string_field(user_id, "action", "None")
         await print_menu(message)
     if text == MainButtons["Profile"]:
-        await cmd_form_edit(message)
+        await cmd_form(message)
     if text == MainButtons["Find"]:
         return
 
