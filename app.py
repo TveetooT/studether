@@ -743,7 +743,7 @@ async def text(message: types.Message):
             return
         await form_question(message)
     if action in ActionEdit:
-        await form_edit(message, action)
+        await form_edit(message, action[:-4])
     if text == ReturnButton["Return"]:
         await set_string_field(user_id, "action", "None")
         await print_menu(message)
