@@ -30,6 +30,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
+ROOT_CODE = os.environ.get("ROOT_CODE")
 # ---------- Подключение к БД ----------
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -69,6 +70,8 @@ Phrases = {
 
     "FormSaved": "Анкета сохранена! Теперь ты можешь искать соседей через /find.",
     "Menu": "Ты в меню. Выбери действие на клавиатуре",
+
+    "RootCode": "Спидозные козявки"
 }
 
 # ---------- Кнопки ----------
@@ -575,6 +578,9 @@ def get_user_sync(user_id: int) -> dict | None:
         return response.data[0]  # первая (и единственная) строка
     return None
 
+def delete_user_sync(user_id: int):
+    response = supabase.table("users").delete().eq("user_id", user_id).execute()
+
 # ---------- Выводим и получаем вопрос в анкете ----------
 async def form_question(message: types.Message):
     text = message.text
@@ -598,7 +604,19 @@ async def form_question(message: types.Message):
 async def get_profile(user_id: int):
     data = await asyncio.to_thread(get_user_sync, user_id)
     if data:
-        text = await format_profile(data)
+        name = data.get("name")
+        age = data.get("age")
+        univer = data.get("univer")
+        about = data.get("about")
+        requirements = data.get("requirements")
+    
+        return (
+            f"<b>{name}</b>, {age} лет | {univer}\n\n"
+            f"<b>О себе: </b>\n"
+            f"<i>{about}</i>\n\n"
+            f"<b>Пожелания к соседу: </b>\n"
+            f"<i>{requirements}</i>\n\n"
+        )
     else:
         text = None
     return text
@@ -620,28 +638,6 @@ async def set_commands(bot: Bot):
     for command in CommandMenu:
         commands.append(BotCommand(command=command, description=CommandMenu[command]))
     await bot.set_my_commands(commands)
-
-# ----------- Работа с данными -------------
-async def format_profile(data: dict) -> str:
-
-    c_user_id = data.get("id")
-
-    c_user_photo = data.get("photo")
-    c_user_name = data.get("name")
-    c_user_age = data.get("age")
-    c_user_city = data.get("city")
-    c_user_university = data.get("univer")
-    c_user_bio = data.get("about")
-
-    return (
-        f"👤 Профиль\n"
-        f"Фото: ебать ты \n"          # пока так, потом можно менять
-        f"Имя: {c_user_name}\n"
-        f"Возраст: {c_user_age}\n"
-        f"Город: {c_user_city}\n"
-        f"Университет: {c_user_university}\n"
-        f"О себе: {c_user_bio}"
-    )
 
 # ---------- Бот и диспетчер ----------
 bot = Bot(token=TOKEN)
@@ -676,6 +672,7 @@ async def cmd_test(message: types.Message):
     TestIKB.adjust(1)
     TestIK = TestIKB.as_markup()
     await message.answer("TestAnswer", reply_markup=TestIK)
+
 # ----------- Обработка команд -------------
 async def command(message: types.Message):
     text = message.text
@@ -695,6 +692,10 @@ async def text(message: types.Message):
     text = message.text
     user_id = message.from_user.id
     action = await get_field(user_id, "action")
+    if text == ROOT_CODE and await get_field(user_id, "root") != "true":
+        await set_string_field(user_id, "root", "true")
+        await message.answer(Phrases["RootCode"])
+        return
     if action in Actions:    
         if action == "confirm":
             await set_string_field(user_id, "form", "true")
@@ -707,6 +708,21 @@ async def text(message: types.Message):
             return
         await form_question(message)
 
+# ---------- Консольные команды ----------
+async def cmd(message: types.Message):
+    text = message.text
+    user_id = message.from_user.id
+    if await get_field(user_id, "root") != "true":
+        return
+    if text == "cmd_deleteform":
+        if len(text) == 14:
+            user_id = message.from_user.id
+        elif len(text) == 25:
+            user_id = int(text[15:])
+        else:
+            await message.answer("Неверный формат команды")
+            return
+        await delete_user_sync(user_id)
 # ---------- Принимаем сообщения ----------
 @dp.message()
 async def message(message: types.Message):
@@ -714,6 +730,8 @@ async def message(message: types.Message):
     user_id = message.from_user.id
     if mtext and mtext[0] == "/":
         await command(message)
+    elif mtext and mtext[:4] == "cmd_":
+        await cmd(message)
     else:
         await text(message)
 
