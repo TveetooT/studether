@@ -42,6 +42,10 @@ Actions = [
     "name", "age", "univer", "about", "requirements", "confirm"
 ]
 
+ActionEdit = [
+    "name_editing", "age_editing", "univer_editing", "about_editing", "requirements_editing", "region_editing", "city_editing"
+]
+
 InlineKeyboardActions = [
     "region", "city"
 ]
@@ -77,7 +81,7 @@ Phrases = {
 # ---------- Кнопки ----------
 # ---------- главное меню ----------
 MainButtons = {
-    "Profile": "👤 Мой профиль",
+    "Profile": "👤 Моя анкета",
     "Find": "🔍 Найти сожителя",
 }
 
@@ -86,6 +90,22 @@ FormButtons = { #В названии переменной сначала идё�
     "Confirm": "Всё хорошо",
     "Restart": "Заполнить заново",
 }
+
+# ---------- Редактирование анкеты ----------
+EditButtons = {
+    "name": "Изменить имя",
+    "age": "Изменить возраст",
+    "univer": "Изменить учебное заведение",
+    "about": "Изменить описание",
+    "requirements": "Изменить пожелания",
+    "region": "Изменить регион",
+    "city": "Изменить город",
+
+}
+
+# ---------- Кнопка назад ----------
+ReturnButton = {
+    "Return": "⬅️ Назад",}
 
 NextAction = { 
     "name": "age",
@@ -526,6 +546,10 @@ for text in FormButtons:
     FormConfirmKeyboardBuilder.button(text=FormButtons[text])
 FormConfirmKeyboardBuilder.adjust(1, 2)
 FormConfirmKeyboard = FormConfirmKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
+# ---------- Клавиатура в анкете ----------
+FormReturnKeyboardBuilder = ReplyKeyboardBuilder()
+FormReturnKeyboardBuilder.button(text=ReturnButton["Return"])
+FormReturnKeyboard = FormReturnKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 
 # ---------- Inline Клавиатуры ----------
 # ---------- Выбор региона ----------
@@ -535,6 +559,12 @@ for idx, region in enumerate(region_keys):
     RegionInlineKeyboardBuilder.button(text=region, callback_data=f"reg_{idx}" )
 RegionInlineKeyboardBuilder.adjust(1)
 RegionInlineKeyboard = RegionInlineKeyboardBuilder.as_markup()
+# ---------- Клавиатура в анкете ----------
+FormEditKeyboardBuilder = InlineKeyboardBuilder()
+for text in EditButtons:
+    FormEditKeyboardBuilder.button(text=EditButtons[text], callback_data=f"edit_{text}")
+FormEditKeyboardBuilder.adjust(1, 2)
+FormEditKeyboard = FormEditKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 
 # ---------- Выбор города ----------
 Cities = {}
@@ -599,7 +629,17 @@ async def form_question(message: types.Message):
     await set_string_field(user_id, "action", nextaction)
     if nextaction == "confirm":
         await message.answer(await get_profile(user_id), reply_markup=FormConfirmKeyboard)
-    
+
+async def form_edit(message: types.Message, action: str):
+    user_id = message.from_user.id
+    nextaction = NextAction[action]
+    reply = None
+    if nextaction == "region":
+        reply = RegionInlineKeyboard
+    if nextaction == "city":
+        reply = Cities[await get_field(user_id, "region")]
+    await message.answer(Phrases[nextaction+"Message1"], reply_markup=reply)
+    await set_string_field(user_id, "action", nextaction)
 # ----------- Выводим профиль -----------
 async def get_profile(user_id: int):
     data = await asyncio.to_thread(get_user_sync, user_id)
@@ -649,19 +689,20 @@ async def cmd_start(message: types.Message):
     await asyncio.to_thread(new_user_sync, user_id)
     await message.answer(Phrases['StartMessage'])
 
-
-async def cmd_profile(message: types.Message):
+async def cmd_form(message: types.Message):
     user_id = message.from_user.id
     text = await get_profile(user_id)
     if text is not None:
-        await message.answer(text)
+        await message.answer(text, parse_mode="HTML", reply_markup=FormEditKeyboard)
     else:
         await message.answer("Профиль не существует")
 
-async def cmd_form(message: types.Message):
+async def cmd_form_edit(message: types.Message):
     user_id = message.from_user.id
     await asyncio.to_thread(new_user_sync, user_id)
+
     await start_form(message, user_id)
+    await set_string_field(user_id, "action", "form")
 
 async def cmd_menu(message: types.Message):
      await print_menu(message)
@@ -679,7 +720,7 @@ async def command(message: types.Message):
     if text == "/start":
         await cmd_start(message)
     elif text == "/profile":
-        await cmd_profile(message)
+        await cmd_form_edit(message)
     elif text == "/form":
         await cmd_form(message)
     elif text == "/menu":
@@ -707,6 +748,12 @@ async def text(message: types.Message):
                 await print_menu(message)
             return
         await form_question(message)
+    if action in ActionEdit:
+        await form_edit(message, action)
+        await cmd_form_edit(message)
+    if text == ReturnButton["Return"]:
+        await set_string_field(user_id, "action", "None")
+        await print_menu(message)
 
 # ---------- Консольные команды ----------
 async def cmd(message: types.Message):
@@ -722,7 +769,8 @@ async def cmd(message: types.Message):
         else:
             await message.answer("Неверный формат команды")
             return
-        await delete_user_sync(user_id)
+        await asyncio.to_thread(delete_user_sync, user_id)
+
 # ---------- Принимаем сообщения ----------
 @dp.message()
 async def message(message: types.Message):
@@ -756,10 +804,12 @@ async def callback_query(callback: CallbackQuery):
         await set_string_field(user_id, "action", "confirm")
         await callback.answer()
         profile_text = await get_profile(user_id)
-        await callback.message.answer(
-            Phrases["confirmMessage"] + "\n" + profile_text,
-            reply_markup=FormConfirmKeyboard
-        )
+        await callback.message.answer(Phrases["confirmMessage"] + "\n" + profile_text, reply_markup=FormConfirmKeyboard)
+    elif data.startswith("edit_"):
+        field = data[5:]+"_editing"
+        await set_string_field(user_id, "action", field)
+        await callback.answer()
+        await callback.message.answer(Phrases[field+"Message1"], reply_markup=FormReturnKeyboard)
     else:
         await callback.answer()
         await bot.send_message(user_id, data)
