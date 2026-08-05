@@ -43,11 +43,15 @@ Actions = [
 ]
 
 ActionEdit = [
-    "nameEdit", "ageEdit", "univerEdit", "aboutEdit", "requirementsEdit", "regionEdit", "cityEdit"
+    "nameEdit", "ageEdit", "univerEdit", "aboutEdit", "requirementsEdit",
 ]
 
 InlineKeyboardActions = [
     "region", "city"
+]
+
+InlineKeyboardActionsEdit = [
+    "regionEdit", "cityEdit"
 ]
 
 # ---------- Словари ----------
@@ -98,7 +102,6 @@ EditButtons = {
     "univer": "Изменить учебное заведение",
     "about": "Изменить описание",
     "requirements": "Изменить пожелания",
-    "region": "Изменить регион",
     "city": "Изменить город",
 
 }
@@ -692,12 +695,6 @@ async def cmd_form(message: types.Message):
     else:
         await message.answer("Профиль не существует")
 
-async def cmd_form_edit(message: types.Message):
-    user_id = message.from_user.id
-    await asyncio.to_thread(new_user_sync, user_id)
-    await start_form(message, user_id)
-    await set_string_field(user_id, "action", "form")
-
 async def cmd_menu(message: types.Message):
      await print_menu(message)
 
@@ -744,6 +741,7 @@ async def text(message: types.Message):
         await form_question(message)
     if action in ActionEdit:
         await form_edit(message, action[:-4])
+        await cmd_form(message)
     if text == ReturnButton["Return"]:
         await set_string_field(user_id, "action", "None")
         await print_menu(message)
@@ -790,7 +788,10 @@ async def callback_query(callback: CallbackQuery):
         region_idx = int(data.split("_")[1])
         region_name = list(Regions.keys())[region_idx]
         await set_string_field(user_id, "region", region_name)
-        await set_string_field(user_id, "action", "city")
+        if await get_field(user_id, "action") != "regionEdit":
+            await set_string_field(user_id, "action", "city")
+        else:
+            await set_string_field(user_id, "action", "cityEdit")
         await callback.answer()
         if form != "true":
             await callback.message.answer(Phrases["cityMessage2"])
@@ -798,6 +799,9 @@ async def callback_query(callback: CallbackQuery):
     elif data.startswith("city_"):  
         city_name = data[5:]  
         await set_string_field(user_id, "city", city_name)
+        if await get_field(user_id, "action") == "cityEdit":
+            await cmd_form(callback.message)
+            return
         await set_string_field(user_id, "action", "confirm")
         await callback.answer()
         profile_text = await get_profile(user_id)
@@ -805,8 +809,9 @@ async def callback_query(callback: CallbackQuery):
     elif data.startswith("edit_"):
         action = data[5:]
         reply = None
-        if action in InlineKeyboardActions:
-            reply = InlineKeyboardActions[action]
+        if action == "city":
+            reply = RegionInlineKeyboard
+            action = "region"
         await set_string_field(user_id, "action", action+"Edit")
         await callback.message.answer(Phrases[action+"Message1"], reply_markup=reply)
         await callback.answer()
