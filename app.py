@@ -631,13 +631,13 @@ async def form_question(message: types.Message):
     await message.answer(Phrases[nextaction+"Message1"], reply_markup=reply)
     await set_string_field(user_id, "action", nextaction)
     if nextaction == "confirm":
-        await message.answer(await get_profile(user_id), reply_markup=FormConfirmKeyboard)
+        await message.answer(await get_profile(user_id), reply_markup=FormConfirmKeyboard, parse_mode="HTML")
 
 async def form_edit(message: types.Message, action: str):
     user_id = message.from_user.id
     text = message.text
     await set_string_field(user_id, action, text)
-    await message.answer(get_profile(user_id), reply_markup=FormEditKeyboard)
+    await message.answer(await get_profile(user_id), reply_markup=FormEditKeyboard, parse_mode="HTML")
 # ----------- Выводим профиль -----------
 async def get_profile(user_id: int):
     data = await asyncio.to_thread(get_user_sync, user_id)
@@ -687,8 +687,11 @@ async def cmd_start(message: types.Message):
     await asyncio.to_thread(new_user_sync, user_id)
     await message.answer(Phrases['StartMessage'])
 
-async def cmd_form(message: types.Message):
-    user_id = message.from_user.id
+async def cmd_form(message: types.Message, user_id= None):
+    if user_id is None:
+        user_id = message.from_user.id
+    else:
+        user_id = int(user_id)
     text = await get_profile(user_id)
     if text is not None:
         await message.answer(text, parse_mode="HTML", reply_markup=FormEditKeyboard)
@@ -741,12 +744,12 @@ async def text(message: types.Message):
         await form_question(message)
     if action in ActionEdit:
         await form_edit(message, action[:-4])
-        await cmd_form(message)
+        await cmd_form(message, user_id=user_id)
     if text == ReturnButton["Return"]:
         await set_string_field(user_id, "action", "None")
         await print_menu(message)
     if text == MainButtons["Profile"]:
-        await cmd_form(message)
+        await cmd_form(message, user_id=user_id)
     if text == MainButtons["Find"]:
         return
 
@@ -800,12 +803,12 @@ async def callback_query(callback: CallbackQuery):
         city_name = data[5:]  
         await set_string_field(user_id, "city", city_name)
         if await get_field(user_id, "action") == "cityEdit":
-            await cmd_form(callback.message)
+            await cmd_form(callback.message, user_id=user_id)
             return
         await set_string_field(user_id, "action", "confirm")
         await callback.answer()
         profile_text = await get_profile(user_id)
-        await callback.message.answer(Phrases["confirmMessage"] + "\n" + profile_text, reply_markup=FormConfirmKeyboard)
+        await callback.message.answer(Phrases["confirmMessage"] + "\n" + profile_text, reply_markup=FormConfirmKeyboard, parse_mode="HTML")
     elif data.startswith("edit_"):
         action = data[5:]
         reply = None
