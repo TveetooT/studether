@@ -689,7 +689,7 @@ async def cmd_start(message: types.Message):
 
 async def cmd_form(message: types.Message, user_id= None):
     if message.from_user.id == user_id:
-        await message.answer(f"Город поиска: {await get_field(user_id, 'city')}")
+        await message.answer(f"Город поиска: {await get_field(user_id, 'city')}({await get_field(user_id, 'region')})")
     if user_id is None:
         user_id = message.from_user.id
     else:
