@@ -400,7 +400,7 @@ async def cmd_likes(message: types.Message, user_id=None):
     if await asyncio.to_thread(_sync) == []:
         await message.answer("У вас нет новых лайков.")
         return
-    likes = await (asyncio.to_thread(_sync))[0]
+    likes = (await asyncio.to_thread(_sync))[0]
     liked_user_id = likes.get("user_id")
     form = await asyncio.to_thread(get_user_sync, liked_user_id)
     profile_text = await print_profile(data=form)
@@ -550,6 +550,7 @@ async def callback_query(callback: CallbackQuery):
             await set_string_field(user_id, "state", "dislike", table="views", additional_field="viewed_user_id", additional_value=int((await get_field(user_id, "action")).split("_")[1]))
         elif reaction == "report":
             await set_int_field(int((await get_field(user_id, "action")).split("_")[1]), "reports", await get_field(int((await get_field(user_id, "action")).split("_")[1]), "reports") + 1)
+        await set_string_field(user_id, "state", "seen", table="views", additional_field="viewed_user_id", additional_value=int((await get_field(user_id, "action")).split("_")[1]))
         await callback.answer()
         await set_string_field(user_id, "action", "None")
         await cmd_find(callback.message, user_id=user_id)
