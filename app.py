@@ -401,7 +401,7 @@ async def cmd_likes(message: types.Message, user_id=None):
         await message.answer("У вас нет новых лайков.")
         return
     likes = await (asyncio.to_thread(_sync))[0]
-    liked_user_id = likes.get("viewed_user_id")
+    liked_user_id = likes.get("user_id")
     form = await asyncio.to_thread(get_user_sync, liked_user_id)
     profile_text = await print_profile(data=form)
     if profile_text is not None:
