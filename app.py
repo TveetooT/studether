@@ -106,6 +106,13 @@ EditButtons = {
 
 }
 
+# ---------- Просмотр анкеты ----------
+ViewButtons = {
+    "like": "👍",
+    "dislike": "👎",
+    "report": "⚠️ Пожаловаться"
+}
+
 # ---------- Кнопка назад ----------
 ReturnButton = {
     "Return": "⬅️ Назад",}
@@ -125,6 +132,7 @@ CommandMenu = {
     "profile": "Вывести анкету",
     "form": "Заполнить анкету",
     "menu": "Меню",
+    "find": "Найти сожителя",
 }
 
 Regions = {
@@ -562,12 +570,18 @@ for idx, region in enumerate(region_keys):
     RegionInlineKeyboardBuilder.button(text=region, callback_data=f"reg_{idx}" )
 RegionInlineKeyboardBuilder.adjust(1)
 RegionInlineKeyboard = RegionInlineKeyboardBuilder.as_markup()
-# ---------- Клавиатура в анкете ----------
+# ---------- Редактирование анкеты ----------
 FormEditKeyboardBuilder = InlineKeyboardBuilder()
 for text in EditButtons:
     FormEditKeyboardBuilder.button(text=EditButtons[text], callback_data=f"edit_{text}")
 FormEditKeyboardBuilder.adjust(1, 2)
 FormEditKeyboard = FormEditKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
+# ---------- Просмотр анкеты ----------
+FormViewKeyboardBuilder = InlineKeyboardBuilder()
+for text in ViewButtons:
+    FormViewKeyboardBuilder.button(text=ViewButtons[text], callback_data=f"view_{text}")
+FormViewKeyboardBuilder.adjust(1)
+FormViewKeyboard = FormViewKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 
 # ---------- Выбор города ----------
 Cities = {}
@@ -579,21 +593,28 @@ for region in region_keys:
     Cities[region] = builder.as_markup()   
     
 # ---------- Функция для БД ----------
+#--------- Добавляем нового пользователя ----------
 def new_user_sync(user_id: int):
     response = supabase.table("users").upsert(
         {"user_id": user_id}, on_conflict="user_id"
     ).execute()
 
-async def set_string_field(user_id: int, field: str, value: str):
+async def set_string_field(user_id: int, field: str, value: str, table: str = "users", additional_field: str=None, additional_value: str=None):
     def _update():
-        return supabase.table("users").update({field: value}).eq("user_id", user_id).execute()
+        if additional_field is not None and additional_value is not None:
+            return supabase.table(table).update({field: value}).eq("user_id", user_id).eq(additional_field, additional_value).execute()
+        return supabase.table(table).update({field: value}).eq("user_id", user_id).execute()
     await asyncio.to_thread(_update)
 
-async def set_int_field(user_id: int, field: str, value: int):
+async def set_int_field(user_id: int, field: str, value: int, table: str = "users", additional_field: str=None, additional_value: int=None):
     def _update():
-        return supabase.table("users").update({field: value}).eq("user_id", user_id).execute()
+        if additional_field is not None and additional_value is not None:
+            return supabase.table(table).update({field: value}).eq("user_id", user_id).eq(additional_field, additional_value).execute()
+        return supabase.table(table).update({field: value}).eq("user_id", user_id).execute()
     await asyncio.to_thread(_update)
 
+
+# ---------- Получаем поле из БД ----------
 async def get_field(user_id: int, field: str):
     def _select():
         return supabase.table("users").select(field).eq("user_id", user_id).execute()
@@ -605,14 +626,33 @@ async def get_field(user_id: int, field: str):
     except Exception as e:
         return None
 
+# ---------- Получаем пользователя ----------
 def get_user_sync(user_id: int) -> dict | None:
     response = supabase.table("users").select("*").eq("user_id", user_id).execute()
     if response.data:
-        return response.data[0]  # первая (и единственная) строка
+        return response.data[0] 
     return None
 
+# ---------- Удаляем пользователя ----------
 def delete_user_sync(user_id: int):
     response = supabase.table("users").delete().eq("user_id", user_id).execute()
+
+# ---------- Добавляем просмотр ----------
+async def add_view(user_id: int, viewed_user_id: int):
+    def _update():
+        response = supabase.table("views").upsert({"user_id": user_id, "viewed_user_id": viewed_user_id}, on_conflict="user_id,viewed_user_id").execute()
+        return response
+    await asyncio.to_thread(_update)
+
+# ---------- Получаем анкету ----------
+async def get_unseen_form(user_id: int, city: str):
+    def _sync():
+        response = supabase.rpc("get_unseen_users", {"p_user_id": user_id, "p_city": city, "p_limit": 1}).execute()
+        if response.data == []:
+            return None
+        await add_view(user_id, response.data[0]["user_id"])
+        return response.data[0]
+    return await asyncio.to_thread(_sync)
 
 # ---------- Выводим и получаем вопрос в анкете ----------
 async def form_question(message: types.Message):
@@ -631,33 +671,47 @@ async def form_question(message: types.Message):
     await message.answer(Phrases[nextaction+"Message1"], reply_markup=reply)
     await set_string_field(user_id, "action", nextaction)
     if nextaction == "confirm":
-        await message.answer(await get_profile(user_id), reply_markup=FormConfirmKeyboard, parse_mode="HTML")
+        await message.answer(await print_profile(user_id=user_id), reply_markup=FormConfirmKeyboard, parse_mode="HTML")
 
+# ---------- Редактируем анкету ----------
 async def form_edit(message: types.Message, action: str):
     user_id = message.from_user.id
     text = message.text
     await set_string_field(user_id, action, text)
-    await message.answer(await get_profile(user_id), reply_markup=FormEditKeyboard, parse_mode="HTML")
+    await message.answer(await print_profile(user_id=user_id), reply_markup=FormEditKeyboard, parse_mode="HTML")
+
 # ----------- Выводим профиль -----------
-async def get_profile(user_id: int):
-    data = await asyncio.to_thread(get_user_sync, user_id)
+async def print_profile(user_id=None, data=None):
+    if data is None:
+        data = await asyncio.to_thread(get_user_sync, user_id)
     if data:
         name = data.get("name")
         age = data.get("age")
         univer = data.get("univer")
         about = data.get("about")
         requirements = data.get("requirements")
-    
+        yearword = ""
+        if age is None:
+            age = ""
+        elif age < 5:
+            yearword = "года"
+        elif age < 21:
+            yearword = "лет"
+        elif age % 10 == 1 and age % 100 != 11:
+            yearword = "год"
+        elif age % 10 in [2, 3, 4] and age % 100 not in [12, 13, 14]:
+            yearword = "года"
+        else:
+            yearword = "лет"
         return (
-            f"<b>{name}</b>, {age} лет | {univer}\n\n"
+            f"<b>{name}</b>, {age} {yearword} | {univer}\n\n"
             f"<b>О себе: </b>\n"
             f"<i>{about}</i>\n\n"
             f"<b>Пожелания к соседу: </b>\n"
             f"<i>{requirements}</i>\n\n"
         )
-    else:
-        text = None
-    return text
+    return None
+
 
 # ----------- Возращаемся в меню -----------
 async def print_menu(message: types.Message):
@@ -685,16 +739,17 @@ dp = Dispatcher()
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
     await asyncio.to_thread(new_user_sync, user_id)
+    await add_view(user_id, user_id) #Что бы не показывать анкету самому себе
     await message.answer(Phrases['StartMessage'])
 
 async def cmd_form(message: types.Message, user_id= None):
-    if message.from_user.id == user_id:
+    if message.from_user.id == user_id and user_id is not None:
         await message.answer(f"Город поиска: {await get_field(user_id, 'city')}({await get_field(user_id, 'region')})")
     if user_id is None:
         user_id = message.from_user.id
     else:
         user_id = int(user_id)
-    text = await get_profile(user_id)
+    text = await print_profile(user_id=user_id)
     if text is not None:
         await message.answer(text, parse_mode="HTML", reply_markup=FormEditKeyboard)
     else:
@@ -710,6 +765,23 @@ async def cmd_test(message: types.Message):
     TestIK = TestIKB.as_markup()
     await message.answer("TestAnswer", reply_markup=TestIK)
 
+async def cmd_find(message: types.Message, user_id=None):
+    if user_id is None:
+        user_id = message.from_user.id
+    city = await get_field(user_id, "city")
+    if city is None:
+        await message.answer("Вы не указали город поиска. Пожалуйста, заполните анкету.")
+        return
+    form = await get_unseen_form(user_id, city)
+    if form is None:
+        await message.answer("Нет доступных анкет для просмотра в вашем городе.")
+        return
+    profile_text = await print_profile(data=form)
+    if profile_text is not None:
+        await message.answer(profile_text, parse_mode="HTML", reply_markup=FormViewKeyboard)
+    else:
+        await message.answer("Ошибка при получении профиля.")
+    await set_string_field(user_id, "action", f"viewing_{form.get('user_id')}")
 # ----------- Обработка команд -------------
 async def command(message: types.Message):
     text = message.text
@@ -723,7 +795,8 @@ async def command(message: types.Message):
         await cmd_menu(message)
     elif text == "/test":
         await cmd_test(message)
-
+    elif text == "/find":
+        await cmd_find(message)
 # ---------- Обработка сообщений ----------
 async def text(message: types.Message):
     text = message.text
@@ -753,6 +826,7 @@ async def text(message: types.Message):
     if text == MainButtons["Profile"]:
         await cmd_form(message, user_id=user_id)
     if text == MainButtons["Find"]:
+        await cmd_find(message)
         return
 
 # ---------- Консольные команды ----------
@@ -761,7 +835,7 @@ async def cmd(message: types.Message):
     user_id = message.from_user.id
     if await get_field(user_id, "root") != "true":
         return
-    if text == "cmd_deleteform":
+    if text.startswith("cmd_deleteform"):
         if len(text) == 14:
             user_id = message.from_user.id
         elif len(text) == 25:
@@ -809,7 +883,7 @@ async def callback_query(callback: CallbackQuery):
             return
         await set_string_field(user_id, "action", "confirm")
         await callback.answer()
-        profile_text = await get_profile(user_id)
+        profile_text = await print_profile(user_id=user_id)
         await callback.message.answer(Phrases["confirmMessage"] + "\n" + profile_text, reply_markup=FormConfirmKeyboard, parse_mode="HTML")
     elif data.startswith("edit_"):
         action = data[5:]
@@ -820,6 +894,17 @@ async def callback_query(callback: CallbackQuery):
         await set_string_field(user_id, "action", action+"Edit")
         await callback.message.answer(Phrases[action+"Message1"], reply_markup=reply)
         await callback.answer()
+    elif data.startswith("view_"):
+        reaction = data[5:]
+        if reaction == "like":
+            await set_string_field(user_id, "state", "like_unseen", table="views", additional_field="viewed_user_id", additional_value=int(await get_field(user_id, "action").split("_")[1]))
+        elif reaction == "dislike":
+            await set_string_field(user_id, "state", "dislike", table="views", additional_field="viewed_user_id", additional_value=int(await get_field(user_id, "action").split("_")[1]))
+        elif reaction == "report":
+            await set_int_field(int(await get_field(user_id, "action").split("_")[1]), "reports", await get_field(int(await get_field(user_id, "action").split("_")[1]), "reports") + 1)
+        await callback.answer()
+        await set_string_field(user_id, "action", "None")
+        await cmd_find(callback.message, user_id=user_id)
     else:
         await callback.answer()
         await bot.send_message(user_id, data)
