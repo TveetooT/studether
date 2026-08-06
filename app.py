@@ -230,20 +230,22 @@ async def get_field(user_id: int, field: str):
         return None
 
 # ---------- Получаем пользователя ----------
-def get_user_sync(user_id: int) -> dict | None:
-    response = supabase.table("users").select("*").eq("user_id", user_id).execute()
-    if response.data:
-        return response.data[0] 
-    return None
+async def get_user_sync(user_id: int):
+    def _update():
+        response = supabase.table("users").select("*").eq("user_id", user_id).execute()
+        if response.data:
+            return response.data[0] 
+        return None
+    await asyncio.to_thread(_update)
 
 # ---------- Удаляем пользователя ----------
 def delete_user_sync(user_id: int):
     response = supabase.table("users").delete().eq("user_id", user_id).execute()
 
 # ---------- Добавляем просмотр ----------
-async def add_view(user_id: int, viewed_user_id: int):
+async def add_view(user_id: int, viewed_user_id: int, state: str = "unseen"):
     def _update():
-        response = supabase.table("views").upsert({"user_id": user_id, "viewed_user_id": viewed_user_id}, on_conflict="user_id,viewed_user_id").execute()
+        response = supabase.table("views").upsert({"user_id": user_id, "viewed_user_id": viewed_user_id, "state": state}, on_conflict="user_id,viewed_user_id").execute()
         return response
     await asyncio.to_thread(_update)
 
@@ -288,7 +290,7 @@ async def form_edit(message: types.Message, action: str):
 # ----------- Выводим профиль -----------
 async def print_profile(user_id=None, data=None):
     if data is None:
-        data = await asyncio.to_thread(get_user_sync, user_id)
+        data = await get_user_sync(user_id)
     if data:
         name = data.get("name")
         age = data.get("age")
@@ -344,7 +346,7 @@ dp = Dispatcher()
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
     await asyncio.to_thread(new_user_sync, user_id)
-    await add_view(user_id, user_id) #Что бы не показывать анкету самому себе
+    await add_view(user_id, user_id, state="seen") #Что бы не показывать анкету самому себе
     await message.answer(Phrases['StartMessage'])
 
 async def cmd_form(message: types.Message, user_id= None):
@@ -402,7 +404,7 @@ async def cmd_likes(message: types.Message, user_id=None):
         return
     likes = (await asyncio.to_thread(_sync))[0]
     liked_user_id = likes.get("user_id")
-    form = await asyncio.to_thread(get_user_sync, liked_user_id)
+    form = await get_user_sync(liked_user_id)
     profile_text = await print_profile(data=form)
     if profile_text is not None:
         await message.answer(profile_text, parse_mode="HTML", reply_markup=FormViewKeyboard)
@@ -537,7 +539,7 @@ async def callback_query(callback: CallbackQuery):
             liked_user_id = int((await get_field(user_id, "action")).split("_")[1])
             if reaction == "like":
                 await bot.send_message(liked_user_id, f"Совпадение с @{callback.from_user.username}! Свяжитесь чтобы обсудить сожительство!")
-                await bot.send_message(user_id, f"Совпадение с @{(get_user_sync(liked_user_id)).get('username')}! Свяжитесь чтобы обсудить сожительство!")
+                await bot.send_message(user_id, f"Совпадение с @{(await get_user_sync(liked_user_id)).get('username')}! Свяжитесь чтобы обсудить сожительство!")
             elif reaction == "dislike":
                 await cmd_likes(callback.message, user_id=user_id)
             elif reaction == "report":
