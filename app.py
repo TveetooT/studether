@@ -533,7 +533,7 @@ async def callback_query(callback: CallbackQuery):
         await callback.answer()
     elif data.startswith("view_"):
         reaction = data[5:]
-        if await get_field(user_id, "action").startswith("likes"):
+        if (await get_field(user_id, "action")).startswith("likes"):
             liked_user_id = int((await get_field(user_id, "action")).split("_")[1])
             if reaction == "like":
                 await bot.send_message(liked_user_id, f"Совпадение с @{callback.from_user.username}! Свяжитесь чтобы обсудить сожительство!")
