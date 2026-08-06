@@ -648,11 +648,13 @@ async def add_view(user_id: int, viewed_user_id: int):
 async def get_unseen_form(user_id: int, city: str):
     def _sync():
         response = supabase.rpc("get_unseen_users", {"p_user_id": user_id, "p_city": city, "p_limit": 1}).execute()
-        if response.data == []:
-            return None
-        await add_view(user_id, response.data[0]["user_id"])
-        return response.data[0]
-    return await asyncio.to_thread(_sync)
+        if response.data:
+            return response.data[0]
+        return None
+    form = await asyncio.to_thread(_sync)
+    if form:
+        await add_view(user_id, form["user_id"])
+    return form
 
 # ---------- Выводим и получаем вопрос в анкете ----------
 async def form_question(message: types.Message):
