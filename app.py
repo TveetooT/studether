@@ -580,7 +580,7 @@ FormEditKeyboard = FormEditKeyboardBuilder.as_markup(resize_keyboard=True, one_t
 FormViewKeyboardBuilder = InlineKeyboardBuilder()
 for text in ViewButtons:
     FormViewKeyboardBuilder.button(text=ViewButtons[text], callback_data=f"view_{text}")
-FormViewKeyboardBuilder.adjust(1)
+FormViewKeyboardBuilder.adjust(3)
 FormViewKeyboard = FormViewKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 
 # ---------- Выбор города ----------
@@ -899,11 +899,11 @@ async def callback_query(callback: CallbackQuery):
     elif data.startswith("view_"):
         reaction = data[5:]
         if reaction == "like":
-            await set_string_field(user_id, "state", "like_unseen", table="views", additional_field="viewed_user_id", additional_value=int(await get_field(user_id, "action").split("_")[1]))
+            await set_string_field(user_id, "state", "like_unseen", table="views", additional_field="viewed_user_id", additional_value=int((await get_field(user_id, "action")).split("_")[1]))
         elif reaction == "dislike":
-            await set_string_field(user_id, "state", "dislike", table="views", additional_field="viewed_user_id", additional_value=int(await get_field(user_id, "action").split("_")[1]))
+            await set_string_field(user_id, "state", "dislike", table="views", additional_field="viewed_user_id", additional_value=int((await get_field(user_id, "action")).split("_")[1]))
         elif reaction == "report":
-            await set_int_field(int(await get_field(user_id, "action").split("_")[1]), "reports", await get_field(int(await get_field(user_id, "action").split("_")[1]), "reports") + 1)
+            await set_int_field(int((await get_field(user_id, "action")).split("_")[1]), "reports", await get_field(int((await get_field(user_id, "action")).split("_")[1]), "reports") + 1)
         await callback.answer()
         await set_string_field(user_id, "action", "None")
         await cmd_find(callback.message, user_id=user_id)
