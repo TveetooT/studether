@@ -345,7 +345,9 @@ dp = Dispatcher()
 # ---------- Команды ----------
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
+    username = message.from_user.username
     await asyncio.to_thread(new_user_sync, user_id)
+    await set_string_field(user_id, "username", username)
     await add_view(user_id, user_id, state="seen") #Что бы не показывать анкету самому себе
     await message.answer(Phrases['StartMessage'])
 
@@ -397,13 +399,13 @@ async def cmd_likes(message: types.Message, user_id=None):
     if user_id is None:
         user_id = message.from_user.id
     def _sync():
-        response = supabase.table("views").select("*").eq("user_id", user_id).eq("state", "like_unseen").execute()
+        response = supabase.table("views").select("*").eq("viewed_user_id", user_id).eq("state", "like_unseen").execute()
         return response.data
-    if await asyncio.to_thread(_sync) == []:
+    likes = await asyncio.to_thread(_sync)
+    if not likes:
         await message.answer("У вас нет новых лайков.")
         return
-    likes = (await asyncio.to_thread(_sync))[0]
-    liked_user_id = likes.get("user_id")
+    liked_user_id = likes[0].get("user_id")  # теперь это реально тот, кто лайкнул
     form = await get_user_sync(liked_user_id)
     profile_text = await print_profile(data=form)
     if profile_text is not None:
@@ -412,7 +414,9 @@ async def cmd_likes(message: types.Message, user_id=None):
         await message.answer("Ошибка при получении профиля.")
     await set_string_field(user_id, "action", f"likes_{liked_user_id}")
     
-    
+def clear_all_data_sync():
+    supabase.table("views").delete().neq("user_id", -1).execute()
+    supabase.table("users").delete().neq("user_id", -1).execute()
 
 # ----------- Обработка команд -------------
 async def command(message: types.Message):
@@ -483,6 +487,19 @@ async def cmd(message: types.Message):
             await message.answer("Неверный формат команды")
             return
         await asyncio.to_thread(delete_user_sync, user_id)
+    elif text == "cmd_cleardata":
+        await set_string_field(user_id, "action", "confirm_cleardata")
+        await message.answer(
+            "⚠️ Это удалит ВСЕ данные из таблиц users и views без возможности восстановления.\n"
+            "Для подтверждения отправьте: cmd_cleardata_confirm"
+        )
+    elif text == "cmd_cleardata_confirm":
+        if await get_field(user_id, "action") != "confirm_cleardata":
+            await message.answer("Сначала отправьте cmd_cleardata")
+            return
+        await asyncio.to_thread(clear_all_data_sync)
+        await set_string_field(user_id, "action", "None")
+        await message.answer("✅ Все данные удалены.")
 
 # ---------- Принимаем сообщения ----------
 @dp.message()
@@ -501,6 +518,7 @@ async def message(message: types.Message):
 async def callback_query(callback: CallbackQuery):
     data = callback.data
     user_id = callback.from_user.id
+    await set_string_field(user_id, "username", callback.from_user.username)
     form = await get_field(user_id, "form")
     if data.startswith("reg_"): 
         region_idx = int(data.split("_")[1])
@@ -549,7 +567,12 @@ async def callback_query(callback: CallbackQuery):
             await callback.answer()
             return
         if reaction == "like":
-            await set_string_field(user_id, "state", "like_unseen", table="views", additional_field="viewed_user_id", additional_value=int((await get_field(user_id, "action")).split("_")[1]))
+            liker_username = await get_field(user_id, "username")
+            liked_username = await get_field(liked_user_id, "username")
+            liker_name = f"@{liker_username}" if liker_username else "пользователь без username"
+            liked_name = f"@{liked_username}" if liked_username else "пользователь без username"
+            await bot.send_message(liked_user_id, f"Совпадение с {liker_name}! Свяжитесь чтобы обсудить сожительство!")
+            await bot.send_message(user_id, f"Совпадение с {liked_name}! Свяжитесь чтобы обсудить сожительство!")
         elif reaction == "dislike":
             await set_string_field(user_id, "state", "dislike", table="views", additional_field="viewed_user_id", additional_value=int((await get_field(user_id, "action")).split("_")[1]))
         elif reaction == "report":
