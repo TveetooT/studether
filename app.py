@@ -218,15 +218,18 @@ async def set_int_field(user_id: int, field: str, value: int, table: str = "user
 
 
 # ---------- Получаем поле из БД ----------
-async def get_field(user_id: int, field: str):
+async def get_field(user_id: int, field: str, table: str = "users", additional_field: str = None, additional_value=None):
     def _select():
-        return supabase.table("users").select(field).eq("user_id", user_id).execute()
+        query = supabase.table(table).select(field).eq("user_id", user_id)
+        if additional_field is not None and additional_value is not None:
+            query = query.eq(additional_field, additional_value)
+        return query.execute()
     try:
         response = await asyncio.to_thread(_select)
         if response.data:
             return response.data[0][field]
         return None
-    except Exception as e:
+    except Exception:
         return None
 
 # ---------- Получаем пользователя ----------
@@ -405,7 +408,7 @@ async def cmd_likes(message: types.Message, user_id=None):
     if not likes:
         await message.answer("У вас нет новых лайков.")
         return
-    liked_user_id = likes[0].get("user_id")  # теперь это реально тот, кто лайкнул
+    liked_user_id = likes[0].get("user_id") 
     form = await get_user_sync(liked_user_id)
     if form is None:
         await message.answer("Анкета этого пользователя больше недоступна.")
@@ -559,8 +562,12 @@ async def callback_query(callback: CallbackQuery):
         if (await get_field(user_id, "action")).startswith("likes"):
             liked_user_id = int((await get_field(user_id, "action")).split("_")[1])
             if reaction == "like":
-                await bot.send_message(liked_user_id, f"Совпадение с @{callback.from_user.username}! Свяжитесь чтобы обсудить сожительство!")
-                await bot.send_message(user_id, f"Совпадение с @{(await get_user_sync(liked_user_id)).get('username')}! Свяжитесь чтобы обсудить сожительство!")
+                liker_username = await get_field(user_id, "username")
+                liked_username = await get_field(liked_user_id, "username")
+                liker_name = f"@{liker_username}" if liker_username else "пользователь без username"
+                liked_name = f"@{liked_username}" if liked_username else "пользователь без username"
+                await bot.send_message(liked_user_id, f"Совпадение с {liker_name}! Свяжитесь чтобы обсудить сожительство!")
+                await bot.send_message(user_id, f"Совпадение с {liked_name}! Свяжитесь чтобы обсудить сожительство!")
             elif reaction == "dislike":
                 await cmd_likes(callback.message, user_id=user_id)
             elif reaction == "report":
@@ -569,21 +576,6 @@ async def callback_query(callback: CallbackQuery):
             await set_string_field(user_id, "state", "seen", table="views", additional_field="viewed_user_id", additional_value=liked_user_id)
             await callback.answer()
             return
-        if reaction == "like":
-            liker_username = await get_field(user_id, "username")
-            liked_username = await get_field(liked_user_id, "username")
-            liker_name = f"@{liker_username}" if liker_username else "пользователь без username"
-            liked_name = f"@{liked_username}" if liked_username else "пользователь без username"
-            await bot.send_message(liked_user_id, f"Совпадение с {liker_name}! Свяжитесь чтобы обсудить сожительство!")
-            await bot.send_message(user_id, f"Совпадение с {liked_name}! Свяжитесь чтобы обсудить сожительство!")
-        elif reaction == "dislike":
-            await set_string_field(user_id, "state", "dislike", table="views", additional_field="viewed_user_id", additional_value=int((await get_field(user_id, "action")).split("_")[1]))
-        elif reaction == "report":
-            await set_int_field(int((await get_field(user_id, "action")).split("_")[1]), "reports", await get_field(int((await get_field(user_id, "action")).split("_")[1]), "reports") + 1)
-        await set_string_field(user_id, "state", "seen", table="views", additional_field="viewed_user_id", additional_value=int((await get_field(user_id, "action")).split("_")[1]))
-        await callback.answer()
-        await set_string_field(user_id, "action", "None")
-        await cmd_find(callback.message, user_id=user_id)
     else:
         await callback.answer()
         await bot.send_message(user_id, data)
