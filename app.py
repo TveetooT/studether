@@ -236,7 +236,7 @@ async def get_user_sync(user_id: int):
         if response.data:
             return response.data[0] 
         return None
-    await asyncio.to_thread(_update)
+    return await asyncio.to_thread(_update)
 
 # ---------- Удаляем пользователя ----------
 def delete_user_sync(user_id: int):
@@ -407,6 +407,9 @@ async def cmd_likes(message: types.Message, user_id=None):
         return
     liked_user_id = likes[0].get("user_id")  # теперь это реально тот, кто лайкнул
     form = await get_user_sync(liked_user_id)
+    if form is None:
+        await message.answer("Анкета этого пользователя больше недоступна.")
+        return
     profile_text = await print_profile(data=form)
     if profile_text is not None:
         await message.answer(profile_text, parse_mode="HTML", reply_markup=FormViewKeyboard)
