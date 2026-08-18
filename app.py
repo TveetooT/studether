@@ -36,6 +36,7 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ---------- Константы ----------
 BOT_NAME = "Studether"
+DIAG_TEST_ID = -999999  # служебный ID для self-test, Telegram user_id всегда положительные
 
 # ---------- Списки ----------
 Actions = [
@@ -246,10 +247,16 @@ def delete_user_sync(user_id: int):
     response = supabase.table("users").delete().eq("user_id", user_id).execute()
 
 # ---------- Добавляем просмотр ----------
+# ignore_duplicates=True -> если строка (user_id, viewed_user_id) уже существует,
+# её текущее state НЕ перезаписывается. Это важно: без этого повторный показ
+# анкеты в /find мог бы затирать уже поставленный "like_unseen" обратно на "unseen".
 async def add_view(user_id: int, viewed_user_id: int, state: str = "unseen"):
     def _update():
-        response = supabase.table("views").upsert({"user_id": user_id, "viewed_user_id": viewed_user_id, "state": state}, on_conflict="user_id,viewed_user_id").execute()
-        return response
+        return supabase.table("views").upsert(
+            {"user_id": user_id, "viewed_user_id": viewed_user_id, "state": state},
+            on_conflict="user_id,viewed_user_id",
+            ignore_duplicates=True,
+        ).execute()
     await asyncio.to_thread(_update)
 
 # ---------- Получаем анкету ----------
@@ -293,6 +300,8 @@ async def form_edit(message: types.Message, action: str):
 # ----------- Выводим профиль -----------
 async def print_profile(user_id=None, data=None):
     if data is None:
+        if user_id is None:
+            return None
         data = await get_user_sync(user_id)
     if data:
         name = data.get("name")
@@ -354,13 +363,12 @@ async def cmd_start(message: types.Message):
     await add_view(user_id, user_id, state="seen") #Что бы не показывать анкету самому себе
     await message.answer(Phrases['StartMessage'])
 
-async def cmd_form(message: types.Message, user_id= None):
-    if message.from_user.id == user_id and user_id is not None:
-        await message.answer(f"Город поиска: {await get_field(user_id, 'city')}({await get_field(user_id, 'region')})")
-    if user_id is None:
-        user_id = message.from_user.id
-    else:
+async def cmd_form(message: types.Message, user_id=None):
+    if user_id is not None:
         user_id = int(user_id)
+        await message.answer(f"Город поиска: {await get_field(user_id, 'city')}({await get_field(user_id, 'region')})")
+    else:
+        user_id = message.from_user.id
     text = await print_profile(user_id=user_id)
     if text is not None:
         await message.answer(text, parse_mode="HTML", reply_markup=FormEditKeyboard)
@@ -408,7 +416,7 @@ async def cmd_likes(message: types.Message, user_id=None):
     if not likes:
         await message.answer("У вас нет новых лайков.")
         return
-    liked_user_id = likes[0].get("user_id") 
+    liked_user_id = likes[0].get("user_id")
     form = await get_user_sync(liked_user_id)
     if form is None:
         await message.answer("Анкета этого пользователя больше недоступна.")
@@ -419,10 +427,79 @@ async def cmd_likes(message: types.Message, user_id=None):
     else:
         await message.answer("Ошибка при получении профиля.")
     await set_string_field(user_id, "action", f"likes_{liked_user_id}")
-    
+
+
 def clear_all_data_sync():
     supabase.table("views").delete().neq("user_id", -1).execute()
     supabase.table("users").delete().neq("user_id", -1).execute()
+
+
+def recreate_database_sync():
+    # Вызывает Postgres-функцию recreate_database(), которую нужно один раз
+    # создать в Supabase SQL Editor (см. setup_recreate_function.sql) —
+    # обычный REST-клиент supabase-py не умеет выполнять DDL напрямую.
+    return supabase.rpc("recreate_database").execute()
+
+
+async def run_diagnostics() -> str:
+    results = []
+
+    try:
+        me = await bot.get_me()
+        results.append(f"✅ Telegram API: бот @{me.username} на связи")
+    except Exception as e:
+        results.append(f"❌ Telegram API: {e}")
+
+    try:
+        await asyncio.to_thread(lambda: supabase.table("users").select("user_id").limit(1).execute())
+        results.append("✅ Чтение из таблицы users")
+    except Exception as e:
+        results.append(f"❌ Чтение из таблицы users: {e}")
+
+    try:
+        await asyncio.to_thread(lambda: supabase.table("views").select("user_id").limit(1).execute())
+        results.append("✅ Чтение из таблицы views")
+    except Exception as e:
+        results.append(f"❌ Чтение из таблицы views: {e}")
+
+    try:
+        await asyncio.to_thread(lambda: supabase.rpc(
+            "get_unseen_users", {"p_user_id": DIAG_TEST_ID, "p_city": "__diag__", "p_limit": 1}
+        ).execute())
+        results.append("✅ Функция get_unseen_users отвечает")
+    except Exception as e:
+        results.append(f"❌ Функция get_unseen_users: {e}")
+
+    try:
+        await asyncio.to_thread(new_user_sync, DIAG_TEST_ID)
+        await set_string_field(DIAG_TEST_ID, "action", "diag")
+        value = await get_field(DIAG_TEST_ID, "action")
+        if value == "diag":
+            results.append("✅ Запись/чтение полей users (set_string_field/get_field)")
+        else:
+            results.append(f"❌ Запись/чтение полей users: ожидалось 'diag', получено {value!r}")
+    except Exception as e:
+        results.append(f"❌ Запись/чтение полей users: {e}")
+
+    try:
+        await add_view(DIAG_TEST_ID, DIAG_TEST_ID, state="unseen")
+        state = await get_field(DIAG_TEST_ID, "state", table="views", additional_field="viewed_user_id", additional_value=DIAG_TEST_ID)
+        if state == "unseen":
+            results.append("✅ Запись/чтение таблицы views (add_view)")
+        else:
+            results.append(f"❌ Запись/чтение таблицы views: ожидалось 'unseen', получено {state!r}")
+    except Exception as e:
+        results.append(f"❌ Запись/чтение таблицы views: {e}")
+
+    try:
+        await asyncio.to_thread(lambda: supabase.table("views").delete().eq("user_id", DIAG_TEST_ID).execute())
+        await asyncio.to_thread(delete_user_sync, DIAG_TEST_ID)
+        results.append("✅ Очистка тестовых данных")
+    except Exception as e:
+        results.append(f"❌ Очистка тестовых данных: {e}")
+
+    return "🔧 Диагностика Studether\n\n" + "\n".join(results)
+
 
 # ----------- Обработка команд -------------
 async def command(message: types.Message):
@@ -486,13 +563,14 @@ async def cmd(message: types.Message):
         return
     if text.startswith("cmd_deleteform"):
         if len(text) == 14:
-            user_id = message.from_user.id
+            target_id = message.from_user.id
         elif len(text) == 25:
-            user_id = int(text[15:])
+            target_id = int(text[15:])
         else:
             await message.answer("Неверный формат команды")
             return
-        await asyncio.to_thread(delete_user_sync, user_id)
+        await asyncio.to_thread(delete_user_sync, target_id)
+        await message.answer("Анкета удалена.")
     elif text == "cmd_cleardata":
         await set_string_field(user_id, "action", "confirm_cleardata")
         await message.answer(
@@ -504,8 +582,28 @@ async def cmd(message: types.Message):
             await message.answer("Сначала отправьте cmd_cleardata")
             return
         await asyncio.to_thread(clear_all_data_sync)
-        await set_string_field(user_id, "action", "None")
-        await message.answer("✅ Все данные удалены.")
+        await message.answer("✅ Все данные удалены. Отправьте /start и код root заново, чтобы продолжить как администратор.")
+    elif text == "cmd_recreatedb":
+        await set_string_field(user_id, "action", "confirm_recreatedb")
+        await message.answer(
+            "⚠️ Это ПОЛНОСТЬЮ удалит и заново создаст таблицы users, views и функцию get_unseen_users.\n"
+            "Требуется, чтобы в Supabase уже была создана функция recreate_database "
+            "(см. setup_recreate_function.sql, выполняется один раз через SQL Editor).\n"
+            "Для подтверждения отправьте: cmd_recreatedb_confirm"
+        )
+    elif text == "cmd_recreatedb_confirm":
+        if await get_field(user_id, "action") != "confirm_recreatedb":
+            await message.answer("Сначала отправьте cmd_recreatedb")
+            return
+        try:
+            await asyncio.to_thread(recreate_database_sync)
+            await message.answer("✅ База данных пересоздана. Отправьте /start и код root заново, чтобы продолжить как администратор.")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка при пересоздании БД: {e}")
+    elif text == "cmd_selftest":
+        await message.answer("⏳ Запускаю диагностику...")
+        report = await run_diagnostics()
+        await message.answer(report)
 
 # ---------- Принимаем сообщения ----------
 @dp.message()
@@ -559,8 +657,12 @@ async def callback_query(callback: CallbackQuery):
         await callback.answer()
     elif data.startswith("view_"):
         reaction = data[5:]
-        if (await get_field(user_id, "action")).startswith("likes"):
-            liked_user_id = int((await get_field(user_id, "action")).split("_")[1])
+        action_value = await get_field(user_id, "action")
+        if not action_value:
+            await callback.answer("Действие устарело, начните заново.")
+            return
+        if action_value.startswith("likes"):
+            liked_user_id = int(action_value.split("_")[1])
             if reaction == "like":
                 liker_username = await get_field(user_id, "username")
                 liked_username = await get_field(liked_user_id, "username")
@@ -568,14 +670,44 @@ async def callback_query(callback: CallbackQuery):
                 liked_name = f"@{liked_username}" if liked_username else "пользователь без username"
                 await bot.send_message(liked_user_id, f"Совпадение с {liker_name}! Свяжитесь чтобы обсудить сожительство!")
                 await bot.send_message(user_id, f"Совпадение с {liked_name}! Свяжитесь чтобы обсудить сожительство!")
-            elif reaction == "dislike":
-                await cmd_likes(callback.message, user_id=user_id)
             elif reaction == "report":
                 await set_int_field(liked_user_id, "reports", await get_field(liked_user_id, "reports") + 1)
+            # Сначала фиксируем "seen" для обеих сторон, и только потом (если это
+            # был dislike) переходим к следующему лайку — иначе cmd_likes покажет
+            # ту же самую, ещё не отмеченную как просмотренную, анкету повторно.
             await set_string_field(liked_user_id, "state", "seen", table="views", additional_field="viewed_user_id", additional_value=user_id)
             await set_string_field(user_id, "state", "seen", table="views", additional_field="viewed_user_id", additional_value=liked_user_id)
             await callback.answer()
+            if reaction == "dislike":
+                await cmd_likes(callback.message, user_id=user_id)
             return
+        elif action_value.startswith("viewing"):
+            viewed_id = int(action_value.split("_")[1])
+            if reaction == "like":
+                # Проверяем взаимность: лайкал ли viewed_id нас раньше.
+                mutual_state = await get_field(viewed_id, "state", table="views", additional_field="viewed_user_id", additional_value=user_id)
+                if mutual_state == "like_unseen":
+                    liker_username = await get_field(user_id, "username")
+                    liked_username = await get_field(viewed_id, "username")
+                    liker_name = f"@{liker_username}" if liker_username else "пользователь без username"
+                    liked_name = f"@{liked_username}" if liked_username else "пользователь без username"
+                    await bot.send_message(viewed_id, f"Совпадение с {liker_name}! Свяжитесь чтобы обсудить сожительство!")
+                    await bot.send_message(user_id, f"Совпадение с {liked_name}! Свяжитесь чтобы обсудить сожительство!")
+                    await set_string_field(viewed_id, "state", "seen", table="views", additional_field="viewed_user_id", additional_value=user_id)
+                    await set_string_field(user_id, "state", "seen", table="views", additional_field="viewed_user_id", additional_value=viewed_id)
+                else:
+                    await set_string_field(user_id, "state", "like_unseen", table="views", additional_field="viewed_user_id", additional_value=viewed_id)
+            elif reaction == "dislike":
+                await set_string_field(user_id, "state", "seen", table="views", additional_field="viewed_user_id", additional_value=viewed_id)
+            elif reaction == "report":
+                await set_int_field(viewed_id, "reports", await get_field(viewed_id, "reports") + 1)
+                await set_string_field(user_id, "state", "seen", table="views", additional_field="viewed_user_id", additional_value=viewed_id)
+            await callback.answer()
+            await set_string_field(user_id, "action", "None")
+            await cmd_find(callback.message, user_id=user_id)
+        else:
+            await callback.answer("Действие устарело, начните заново.")
+            await set_string_field(user_id, "action", "None")
     else:
         await callback.answer()
         await bot.send_message(user_id, data)
@@ -607,4 +739,4 @@ def create_app():
 if __name__ == "__main__":
     app = create_app()
     port = int(os.environ.get("PORT", 5000))
-    web.run_app(app, host="0.0.0.0", port=port) 
+    web.run_app(app, host="0.0.0.0", port=port)
