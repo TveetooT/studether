@@ -121,12 +121,12 @@ BEGIN
   FROM users u
   WHERE u.city = p_city
     AND u.user_id <> p_user_id
-    AND u.form = 'true'
+    AND u.form = 'true' 
     AND NOT EXISTS (
-      SELECT 1 FROM views v
-      WHERE v.user_id = p_user_id
-        AND v.viewed_user_id = u.user_id
-        AND v.state IN ('unseen', 'like_unseen', 'seen')
+      SELECT 1
+      FROM views v
+      WHERE (v.user_id = p_user_id AND v.viewed_user_id = u.user_id)
+         OR (v.user_id = u.user_id AND v.viewed_user_id = p_user_id)
     )
   ORDER BY random()
   LIMIT p_limit;
