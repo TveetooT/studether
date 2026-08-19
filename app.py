@@ -482,11 +482,12 @@ async def cmd_start(message: types.Message):
     user_id = message.from_user.id
     username = message.from_user.username
     await asyncio.to_thread(new_user_sync, user_id)
-    await set_string_field(user_id, "username", username)
-    await add_view(user_id, user_id, state="seen") #Что бы не показывать анкету самому себе
+    await set_string_field(message.from_user.id, "username", message.from_user.username)
+    await add_view(user_id, user_id, state="seen") 
     await message.answer(Phrases['StartMessage'], parse_mode="HTML")
 
 async def cmd_form(message: types.Message, user_id=None):
+    await set_string_field(message.from_user.id, "username", message.from_user.username)
     if user_id is not None:
         user_id = int(user_id)
         await message.answer(f"Город поиска: {await get_field(user_id, 'city')}({await get_field(user_id, 'region')})")
@@ -499,7 +500,8 @@ async def cmd_form(message: types.Message, user_id=None):
         await message.answer("Профиль не существует")
 
 async def cmd_menu(message: types.Message):
-     await print_menu(message)
+    await set_string_field(message.from_user.id, "username", message.from_user.username)
+    await print_menu(message)
 
 async def cmd_test(message: types.Message):
     TestIKB = InlineKeyboardBuilder()
@@ -509,6 +511,7 @@ async def cmd_test(message: types.Message):
     await message.answer("TestAnswer", reply_markup=TestIK)
 
 async def cmd_find(message: types.Message, user_id=None):
+    await set_string_field(message.from_user.id, "username", message.from_user.username)
     if user_id is None:
         user_id = message.from_user.id
     city = await get_field(user_id, "city")
