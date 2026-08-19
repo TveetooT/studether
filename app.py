@@ -394,8 +394,8 @@ async def form_question(message: types.Message):
     if nextaction == "city":
         reply = Cities[await get_field(user_id, "region")]
     if await get_field(user_id, "form") != "true": #Если проходим анкету впервые выводим приветливые сообщения
-        await message.answer(Phrases[nextaction+"Message2"])
-    await message.answer(Phrases[nextaction+"Message1"], reply_markup=reply)
+        await message.answer(Phrases[nextaction+"Message2"], parse_mode="Markdown")
+    await message.answer(Phrases[nextaction+"Message1"], reply_markup=reply, parse_mode="Markdown")
     await set_string_field(user_id, "action", nextaction)
     if nextaction == "confirm":
         await message.answer(await print_profile(user_id=user_id), reply_markup=FormConfirmKeyboard, parse_mode="HTML")
@@ -453,7 +453,7 @@ async def print_profile(user_id=None, data=None):
 
 # ----------- Возращаемся в меню -----------
 async def print_menu(message: types.Message):
-    await message.answer(Phrases["Menu"], reply_markup=MainMenuKeyboard)
+    await message.answer(Phrases["Menu"], reply_markup=MainMenuKeyboard, parse_mode="Markdown")
 
 # ----------- Старт анкеты -----------
 async def start_form(message: types.Message, user_id: int):
@@ -463,7 +463,7 @@ async def start_form(message: types.Message, user_id: int):
         await set_string_field(user_id, "action", "rules")
     else:
         # Анкета уже когда-то была заполнена (это Restart/редактирование с нуля) — правила не повторяем.
-        await message.answer(Phrases['nameMessage1'])
+        await message.answer(Phrases['nameMessage1'], parse_mode="Markdown")
         await set_string_field(user_id, "action", "name")
 
 # ----------- Меню команд -----------
@@ -484,7 +484,7 @@ async def cmd_start(message: types.Message):
     await asyncio.to_thread(new_user_sync, user_id)
     await set_string_field(user_id, "username", username)
     await add_view(user_id, user_id, state="seen") #Что бы не показывать анкету самому себе
-    await message.answer(Phrases['StartMessage'])
+    await message.answer(Phrases['StartMessage'], parse_mode="Markdown")
 
 async def cmd_form(message: types.Message, user_id=None):
     if user_id is not None:
@@ -527,7 +527,7 @@ async def cmd_find(message: types.Message, user_id=None):
     await set_string_field(user_id, "action", f"viewing_{form.get('user_id')}")
 
 async def cmd_faq(message: types.Message):
-    await message.answer(Phrases["FAQMessage"])
+    await message.answer(Phrases["FAQMessage"], parse_mode="Markdown")
 
 async def cmd_likes(message: types.Message, user_id=None):
     if user_id is None:
@@ -650,12 +650,12 @@ async def text(message: types.Message):
     action = await get_field(user_id, "action")
     if text == ROOT_CODE and await get_field(user_id, "root") != "true":
         await set_string_field(user_id, "root", "true")
-        await message.answer(Phrases["RootCode"])
+        await message.answer(Phrases["RootCode"], parse_mode="Markdown")
         return
     if action == "rules":
         if text == RulesButtons["Accept"]:
-            await message.answer(Phrases['nameMessage1'])
-            await message.answer(Phrases['nameMessage2'])
+            await message.answer(Phrases['nameMessage1'], parse_mode="Markdown")
+            await message.answer(Phrases['nameMessage2'], parse_mode="Markdown")
             await set_string_field(user_id, "action", "name")
         else:
             await message.answer("Пожалуйста, подтверди согласие с правилами, чтобы продолжить.", reply_markup=RulesKeyboard)
@@ -668,7 +668,7 @@ async def text(message: types.Message):
             elif text == FormButtons["Confirm"]:
                 await set_string_field(user_id, "form", "true")
                 await set_string_field(user_id, "action", "None")
-                await message.answer(Phrases["FormSaved"])
+                await message.answer(Phrases["FormSaved"], parse_mode="Markdown")
                 await print_menu(message)
             else:
                 await message.answer("Пожалуйста, используй кнопки ниже.", reply_markup=FormConfirmKeyboard)
@@ -767,8 +767,8 @@ async def callback_query(callback: CallbackQuery):
             await set_string_field(user_id, "action", "cityEdit")
         await callback.answer()
         if form != "true":
-            await callback.message.answer(Phrases["cityMessage2"])
-        await callback.message.answer(Phrases["cityMessage1"], reply_markup=Cities[region_name])
+            await callback.message.answer(Phrases["cityMessage2"], parse_mode="Markdown")
+        await callback.message.answer(Phrases["cityMessage1"], reply_markup=Cities[region_name], parse_mode="Markdown")
     elif data.startswith("city_"):  
         city_name = data[5:]  
         await set_string_field(user_id, "city", city_name)
@@ -787,7 +787,7 @@ async def callback_query(callback: CallbackQuery):
             reply = RegionInlineKeyboard
             action = "region"
         await set_string_field(user_id, "action", action+"Edit")
-        await callback.message.answer(Phrases[action+"Message1"], reply_markup=reply)
+        await callback.message.answer(Phrases[action+"Message1"], reply_markup=reply, parse_mode="Markdown")
         await callback.answer()
     elif data.startswith("view_"):
         reaction = data[5:]
