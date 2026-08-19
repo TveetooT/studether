@@ -60,22 +60,22 @@ InlineKeyboardActionsEdit = [
 # ---------- Словари ----------
 Phrases = {
     "StartMessage": (
-        "👋 Привет! Я бот **Studether** — твой помощник в поиске идеального соседа для совместной аренды! 🏠\n\n"
+        "👋 Привет! Я бот <b>Studether</b> — твой помощник в поиске идеального соседа для совместной аренды! 🏠\n\n"
         "Мы подберём тебе друга, с которым будет комфортно делить квартиру и быт. 😊\n\n"
         "Чтобы начать, заполни анкету — это займёт всего пару минут! 📝\n"
         "Просто нажми /form или выбери пункт в меню."
     ),
 
-    "nameMessage1": "📝 **Шаг 1 из 7:** Как тебя называть?",
-    "ageMessage1": "📝 **Шаг 2 из 7:** Сколько тебе лет?",
-    "univerMessage1": "📝 **Шаг 3 из 7:** Где ты учишься? (учебное заведение)",
-    "aboutMessage1": "📝 **Шаг 4 из 7:** Расскажи о себе (что ищешь, чем увлекаешься)",
-    "requirementsMessage1": "📝 **Шаг 5 из 7:** Каким ты хочешь видеть соседа? (пожелания)",
-    "regionMessage1": "📝 **Шаг 6 из 7:** Выбери **регион**, где ищешь жильё 🗺️",
-    "cityMessage1": "📝 **Шаг 7 из 7:** Теперь выбери **город** в этом регионе 🌆",
+    "nameMessage1": "📝 <b>Шаг 1 из 7:</b> Как тебя называть?",
+    "ageMessage1": "📝 <b>Шаг 2 из 7:</b> Сколько тебе лет?",
+    "univerMessage1": "📝 <b>Шаг 3 из 7:</b> Где ты учишься? (учебное заведение)",
+    "aboutMessage1": "📝 <b>Шаг 4 из 7:</b> Расскажи о себе (что ищешь, чем увлекаешься)",
+    "requirementsMessage1": "📝 <b>Шаг 5 из 7:</b> Каким ты хочешь видеть соседа? (пожелания)",
+    "regionMessage1": "📝 <b>Шаг 6 из 7:</b> Выбери <b>регион</b>, где ищешь жильё 🗺️",
+    "cityMessage1": "📝 <b>Шаг 7 из 7:</b> Теперь выбери <b>город</b> в этом регионе 🌆",
 
     "nameMessage2": (
-        "✨ Меня зовут **Studether**. А ты? Под каким именем тебя будут видеть другие люди? "
+        "✨ Меня зовут <b>Studether</b>. А ты? Под каким именем тебя будут видеть другие люди? "
         "Можешь указать имя, ник или даже прозвище — как тебе удобно! 😉"
     ),
     "ageMessage2": "🎂 А сколько тебе лет? Укажи цифру (например, 22).",
@@ -99,19 +99,19 @@ Phrases = {
         "Будь честен — это поможет найти лучшего друга по квартире! 🤝"
     ),
     "regionMessage2": (
-        "🌍 Чтобы мы могли найти соседей в твоём городе, нужно сначала выбрать **регион**.\n"
+        "🌍 Чтобы мы могли найти соседей в твоём городе, нужно сначала выбрать <b>регион</b>.\n"
         "Нажми на кнопку ниже, чтобы выбрать область, край или республику. 👇"
     ),
     "cityMessage2": (
-        "🏙️ Отлично! Теперь выбери **город**, в котором ты хочешь снимать квартиру.\n"
+        "🏙️ Отлично! Теперь выбери <b>город</b>, в котором ты хочешь снимать квартиру.\n"
         "Список городов появится ниже — просто нажми на нужный. 📍"
     ),
 
-    "confirmMessage": "✅ **Проверь свою анкету** — всё ли верно? Если есть ошибки, просто нажми «Заполнить заново».\n\n",
+    "confirmMessage": "✅ <b>Проверь свою анкету</b> — всё ли верно? Если есть ошибки, просто нажми «Заполнить заново».\n\n",
 
-    "FormSaved": "🎉 **Анкета успешно сохранена!**\n\nТеперь ты можешь искать соседей через /find или в меню. Удачи в поиске! 🍀",
+    "FormSaved": "🎉 <b>Анкета успешно сохранена!</b>\n\nТеперь ты можешь искать соседей через /find или в меню. Удачи в поиске! 🍀",
 
-    "Menu": "🏠 **Главное меню**\n\nВыбери действие на клавиатуре ниже:",
+    "Menu": "🏠 <b>Главное меню</b>\n\nВыбери действие на клавиатуре ниже:",
     
     "RootCode": "🔐 Доступ к админ-панели открыт.",
 
@@ -394,8 +394,8 @@ async def form_question(message: types.Message):
     if nextaction == "city":
         reply = Cities[await get_field(user_id, "region")]
     if await get_field(user_id, "form") != "true": #Если проходим анкету впервые выводим приветливые сообщения
-        await message.answer(Phrases[nextaction+"Message2"], parse_mode="Markdown")
-    await message.answer(Phrases[nextaction+"Message1"], reply_markup=reply, parse_mode="Markdown")
+        await message.answer(Phrases[nextaction+"Message2"], parse_mode="HTML")
+    await message.answer(Phrases[nextaction+"Message1"], reply_markup=reply, parse_mode="HTML")
     await set_string_field(user_id, "action", nextaction)
     if nextaction == "confirm":
         await message.answer(await print_profile(user_id=user_id), reply_markup=FormConfirmKeyboard, parse_mode="HTML")
@@ -453,7 +453,7 @@ async def print_profile(user_id=None, data=None):
 
 # ----------- Возращаемся в меню -----------
 async def print_menu(message: types.Message):
-    await message.answer(Phrases["Menu"], reply_markup=MainMenuKeyboard, parse_mode="Markdown")
+    await message.answer(Phrases["Menu"], reply_markup=MainMenuKeyboard, parse_mode="HTML")
 
 # ----------- Старт анкеты -----------
 async def start_form(message: types.Message, user_id: int):
@@ -463,7 +463,7 @@ async def start_form(message: types.Message, user_id: int):
         await set_string_field(user_id, "action", "rules")
     else:
         # Анкета уже когда-то была заполнена (это Restart/редактирование с нуля) — правила не повторяем.
-        await message.answer(Phrases['nameMessage1'], parse_mode="Markdown")
+        await message.answer(Phrases['nameMessage1'], parse_mode="HTML")
         await set_string_field(user_id, "action", "name")
 
 # ----------- Меню команд -----------
@@ -484,7 +484,7 @@ async def cmd_start(message: types.Message):
     await asyncio.to_thread(new_user_sync, user_id)
     await set_string_field(user_id, "username", username)
     await add_view(user_id, user_id, state="seen") #Что бы не показывать анкету самому себе
-    await message.answer(Phrases['StartMessage'], parse_mode="Markdown")
+    await message.answer(Phrases['StartMessage'], parse_mode="HTML")
 
 async def cmd_form(message: types.Message, user_id=None):
     if user_id is not None:
@@ -527,7 +527,7 @@ async def cmd_find(message: types.Message, user_id=None):
     await set_string_field(user_id, "action", f"viewing_{form.get('user_id')}")
 
 async def cmd_faq(message: types.Message):
-    await message.answer(Phrases["FAQMessage"], parse_mode="Markdown")
+    await message.answer(Phrases["FAQMessage"], parse_mode="HTML")
 
 async def cmd_likes(message: types.Message, user_id=None):
     if user_id is None:
@@ -650,12 +650,12 @@ async def text(message: types.Message):
     action = await get_field(user_id, "action")
     if text == ROOT_CODE and await get_field(user_id, "root") != "true":
         await set_string_field(user_id, "root", "true")
-        await message.answer(Phrases["RootCode"], parse_mode="Markdown")
+        await message.answer(Phrases["RootCode"], parse_mode="HTML")
         return
     if action == "rules":
         if text == RulesButtons["Accept"]:
-            await message.answer(Phrases['nameMessage1'], parse_mode="Markdown")
-            await message.answer(Phrases['nameMessage2'], parse_mode="Markdown")
+            await message.answer(Phrases['nameMessage1'], parse_mode="HTML")
+            await message.answer(Phrases['nameMessage2'], parse_mode="HTML")
             await set_string_field(user_id, "action", "name")
         else:
             await message.answer("Пожалуйста, подтверди согласие с правилами, чтобы продолжить.", reply_markup=RulesKeyboard)
@@ -668,7 +668,7 @@ async def text(message: types.Message):
             elif text == FormButtons["Confirm"]:
                 await set_string_field(user_id, "form", "true")
                 await set_string_field(user_id, "action", "None")
-                await message.answer(Phrases["FormSaved"], parse_mode="Markdown")
+                await message.answer(Phrases["FormSaved"], parse_mode="HTML")
                 await print_menu(message)
             else:
                 await message.answer("Пожалуйста, используй кнопки ниже.", reply_markup=FormConfirmKeyboard)
@@ -767,8 +767,8 @@ async def callback_query(callback: CallbackQuery):
             await set_string_field(user_id, "action", "cityEdit")
         await callback.answer()
         if form != "true":
-            await callback.message.answer(Phrases["cityMessage2"], parse_mode="Markdown")
-        await callback.message.answer(Phrases["cityMessage1"], reply_markup=Cities[region_name], parse_mode="Markdown")
+            await callback.message.answer(Phrases["cityMessage2"], parse_mode="HTML")
+        await callback.message.answer(Phrases["cityMessage1"], reply_markup=Cities[region_name], parse_mode="HTML")
     elif data.startswith("city_"):  
         city_name = data[5:]  
         await set_string_field(user_id, "city", city_name)
@@ -787,7 +787,7 @@ async def callback_query(callback: CallbackQuery):
             reply = RegionInlineKeyboard
             action = "region"
         await set_string_field(user_id, "action", action+"Edit")
-        await callback.message.answer(Phrases[action+"Message1"], reply_markup=reply, parse_mode="Markdown")
+        await callback.message.answer(Phrases[action+"Message1"], reply_markup=reply, parse_mode="HTML")
         await callback.answer()
     elif data.startswith("view_"):
         reaction = data[5:]
