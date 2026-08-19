@@ -746,6 +746,10 @@ async def cmd(message: types.Message):
 async def message(message: types.Message):
     mtext = message.text
     user_id = message.from_user.id
+    username = message.from_user.username
+    if not(username):
+        await message.answer("Чтобы пользоваться ботом установите имя пользователя в настройках Telegram")
+        return
     if mtext and mtext[0] == "/":
         await command(message)
     elif mtext and mtext[:4] == "cmd_":
