@@ -250,3 +250,5 @@ python bot.py
 ## 📄 Лицензия
 
 MIT License. Подробности в файле [LICENSE](LICENSE).
+
+19/08/2026 1.0
