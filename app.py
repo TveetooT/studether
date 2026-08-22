@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+import time
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -624,6 +625,43 @@ async def run_diagnostics() -> str:
     except Exception as e:
         results.append(f"❌ Очистка тестовых данных: {e}")
 
+    try:
+        await set_string_field(DIAG_TEST_ID, "city", "Москва")
+        await set_string_field(DIAG_TEST_ID, "form", "true")
+        
+        start = time.time()
+        await asyncio.to_thread(lambda: supabase.table("users").select("*").limit(10).execute())
+        elapsed = time.time() - start
+        results.append(f"⏱️ SELECT * FROM users LIMIT 10: {elapsed:.3f} сек")
+    except Exception as e:
+        results.append(f"❌ SELECT * FROM users LIMIT 10: {e}")
+
+    try:
+        start = time.time()
+        await asyncio.to_thread(lambda: supabase.rpc(
+            "get_unseen_users",
+            {"p_user_id": DIAG_TEST_ID, "p_city": "Москва", "p_limit": 1}
+        ).execute())
+        elapsed = time.time() - start
+        results.append(f"⏱️ Вызов get_unseen_users (Москва): {elapsed:.3f} сек")
+    except Exception as e:
+        results.append(f"❌ get_unseen_users (Москва): {e}")
+
+    try:
+        start = time.time()
+        await asyncio.to_thread(lambda: supabase.table("views").select("*").limit(10).execute())
+        elapsed = time.time() - start
+        results.append(f"⏱️ SELECT * FROM views LIMIT 10: {elapsed:.3f} сек")
+    except Exception as e:
+        results.append(f"❌ SELECT * FROM views LIMIT 10: {e}")
+
+    # ---------- Очистка ----------
+    try:
+        await asyncio.to_thread(lambda: supabase.table("views").delete().eq("user_id", DIAG_TEST_ID).execute())
+        await asyncio.to_thread(delete_user_sync, DIAG_TEST_ID)
+        results.append("✅ Очистка тестовых данных")
+    except Exception as e:
+        results.append(f"❌ Очистка тестовых данных: {e}")
     return "🔧 Диагностика Livether\n\n" + "\n".join(results)
 
 
