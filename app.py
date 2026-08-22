@@ -383,12 +383,16 @@ async def form_question(message: types.Message):
     user_id = message.from_user.id
     action = await get_field(user_id, "action")
 
+    nextaction = NextAction.get(action)
+    if nextaction is None:
+        await message.answer("Что-то пошло не так. Отправь /form, чтобы начать заново.")
+        return
+
     ok, error, value = validate_field(action, text)
     if not ok:
         await message.answer(f"⚠️ {error}")
         return
 
-    nextaction = NextAction[action]
     reply = None
     if action == "age":
         await set_int_field(user_id, action, value)
@@ -775,7 +779,11 @@ async def cmd(message: types.Message):
         if len(text) == 14:
             target_id = message.from_user.id
         elif len(text) == 25:
-            target_id = int(text[15:])
+            try:
+                target_id = int(text[15:])
+            except ValueError:
+                await message.answer("Неверный формат команды")
+                return
         else:
             await message.answer("Неверный формат команды")
             return
@@ -821,7 +829,6 @@ async def message(message: types.Message):
     mtext = message.text
     user_id = message.from_user.id
     username = message.from_user.username
-    print(user_id)
     if not(username):
         await message.answer("Чтобы пользоваться ботом установите имя пользователя в настройках Telegram")
         return
@@ -839,9 +846,16 @@ async def callback_query(callback: CallbackQuery):
     user_id = callback.from_user.id
     await set_string_field(user_id, "username", callback.from_user.username)
     form = await get_field(user_id, "form")
-    if data.startswith("reg_"): 
-        region_idx = int(data.split("_")[1])
-        region_name = list(Regions.keys())[region_idx]
+    if data.startswith("reg_"):
+        try:
+            region_idx = int(data.split("_")[1])
+        except ValueError:
+            await callback.answer("Некорректный выбор региона.")
+            return
+        if not (0 <= region_idx < len(region_keys)):
+            await callback.answer("Некорректный выбор региона.")
+            return
+        region_name = region_keys[region_idx]
         await set_string_field(user_id, "region", region_name)
         if await get_field(user_id, "action") != "regionEdit":
             await set_string_field(user_id, "action", "city")
@@ -864,6 +878,9 @@ async def callback_query(callback: CallbackQuery):
         await callback.message.answer(Phrases["confirmMessage"] + "\n" + profile_text, reply_markup=FormConfirmKeyboard, parse_mode="HTML")
     elif data.startswith("edit_"):
         action = data[5:]
+        if action not in EditButtons:
+            await callback.answer("Неизвестное действие.")
+            return
         reply = None
         if action == "city":
             reply = RegionInlineKeyboard
@@ -878,7 +895,12 @@ async def callback_query(callback: CallbackQuery):
             await callback.answer("Действие устарело, начните заново.")
             return
         if action_value.startswith("likes"):
-            liked_user_id = int(action_value.split("_")[1])
+            try:
+                liked_user_id = int(action_value.split("_")[1])
+            except (IndexError, ValueError):
+                await callback.answer("Действие устарело, начните заново.")
+                await set_string_field(user_id, "action", "None")
+                return
             if reaction == "like":
                 liker_username = await get_field(user_id, "username")
                 liked_username = await get_field(liked_user_id, "username")
@@ -899,7 +921,12 @@ async def callback_query(callback: CallbackQuery):
                 await cmd_likes(callback.message, user_id=user_id)
             return
         elif action_value.startswith("viewing"):
-            viewed_id = int(action_value.split("_")[1])
+            try:
+                viewed_id = int(action_value.split("_")[1])
+            except (IndexError, ValueError):
+                await callback.answer("Действие устарело, начните заново.")
+                await set_string_field(user_id, "action", "None")
+                return
             if reaction == "like":
                 # Проверяем взаимность: лайкал ли viewed_id нас раньше.
                 mutual_state = await get_field(viewed_id, "state", table="views", additional_field="viewed_user_id", additional_value=user_id)
