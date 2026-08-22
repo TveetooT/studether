@@ -2,10 +2,12 @@ import os
 import logging
 import asyncio
 import time
+import html
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import (
+    ErrorEvent,
     BotCommand,                          
     InlineKeyboardMarkup, InlineKeyboardButton,
     CallbackQuery,
@@ -284,9 +286,10 @@ def validate_field(action: str, raw_text):
     text = raw_text.strip()
 
     if action == "age":
-        if not text.isdigit():
+        try:
+            age = int(text)
+        except ValueError:
             return False, "Возраст должен быть числом, например: 22", None
-        age = int(text)
         if age < AGE_MIN or age > AGE_MAX:
             return False, f"Укажи реальный возраст (от {AGE_MIN} до {AGE_MAX} лет).", None
         return True, None, age
@@ -335,7 +338,8 @@ async def get_field(user_id: int, field: str, table: str = "users", additional_f
         if response.data:
             return response.data[0][field]
         return None
-    except Exception:
+    except Exception as e:
+        logger.error("get_field(%s, %s) failed: %s", user_id, field, e)
         return None
 
 # ---------- Получаем пользователя ----------
@@ -424,11 +428,11 @@ async def print_profile(user_id=None, data=None):
             return None
         data = await get_user_sync(user_id)
     if data:
-        name = data.get("name")
+        name = html.escape(str(data.get("name") or ""))
         age = data.get("age")
-        univer = data.get("univer")
-        about = data.get("about")
-        requirements = data.get("requirements")
+        univer = html.escape(str(data.get("univer") or ""))
+        about = html.escape(str(data.get("about") or ""))
+        requirements = html.escape(str(data.get("requirements") or ""))
         yearword = ""
         if age is None:
             age = ""
@@ -477,6 +481,10 @@ async def set_commands(bot: Bot):
 # ---------- Бот и диспетчер ----------
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
+
+@dp.error()
+async def error_handler(event: ErrorEvent):
+    logger.error("Unhandled exception in handler: %s", event.exception, exc_info=event.exception)
 
 # ---------- Команды ----------
 async def cmd_start(message: types.Message):
@@ -724,6 +732,9 @@ async def text(message: types.Message):
         else:
             await message.answer("Пожалуйста, подтверди согласие с правилами, чтобы продолжить.", reply_markup=RulesKeyboard)
         return
+    if action is None or action == "None":
+        await message.answer("Что-то пошло не так. Отправь /form, чтобы начать заново.")
+        return
     if action in Actions:
         if action == "confirm":
             if text == FormButtons["Restart"]:
@@ -738,8 +749,10 @@ async def text(message: types.Message):
                 await message.answer("Пожалуйста, используй кнопки ниже.", reply_markup=FormConfirmKeyboard)
             return
         await form_question(message)
+        return
     if action in ActionEdit:
         await form_edit(message, action[:-4])
+        return
     if text == ReturnButton["Return"]:
         await set_string_field(user_id, "action", "None")
         await print_menu(message)
