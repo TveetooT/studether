@@ -662,6 +662,29 @@ async def run_diagnostics() -> str:
         results.append("✅ Очистка тестовых данных")
     except Exception as e:
         results.append(f"❌ Очистка тестовых данных: {e}")
+    try:
+        def _many_queries():
+            for i in range(100):
+                supabase.table("users").select("user_id").limit(1).execute()
+
+        start = time.time()
+        await asyncio.to_thread(_many_queries)
+        elapsed = time.time() - start
+        results.append(f"⏱️ 100 запросов SELECT user_id LIMIT 1: {elapsed:.3f} сек (в среднем {elapsed/100:.3f} сек/запрос)")
+    except Exception as e:
+        results.append(f"❌ 100 запросов SELECT: {e}")
+
+    try:
+        def _many_rpc():
+            for i in range(100):
+                supabase.rpc("get_unseen_users", {"p_user_id": DIAG_TEST_ID, "p_city": "Москва", "p_limit": 1}).execute()
+
+        start = time.time()
+        await asyncio.to_thread(_many_rpc)
+        elapsed = time.time() - start
+        results.append(f"⏱️ 100 вызовов RPC get_unseen_users: {elapsed:.3f} сек (в среднем {elapsed/100:.3f} сек/вызов)")
+    except Exception as e:
+        results.append(f"❌ 100 вызовов RPC: {e}")
     return "🔧 Диагностика Livether\n\n" + "\n".join(results)
 
 
