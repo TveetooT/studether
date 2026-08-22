@@ -808,6 +808,7 @@ async def message(message: types.Message):
     mtext = message.text
     user_id = message.from_user.id
     username = message.from_user.username
+    print(user_id)
     if not(username):
         await message.answer("Чтобы пользоваться ботом установите имя пользователя в настройках Telegram")
         return
