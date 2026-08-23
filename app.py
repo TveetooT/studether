@@ -959,8 +959,8 @@ async def callback_query(callback: CallbackQuery):
 
 # ---------- Функция установки вебхука (будет вызвана при старте) ----------
 async def on_startup(app: web.Application):
-    await bot.delete_webhook()
-    await bot.set_webhook(WEBHOOK_URL, allowed_updates=dp.resolve_used_update_types())
+    await bot.delete_webhook(drop_pending_updates=True)
+    await bot.set_webhook(WEBHOOK_URL, allowed_updates=dp.resolve_used_update_types(), drop_pending_updates=True)
     await set_commands(bot) 
     
 
