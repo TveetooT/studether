@@ -4,17 +4,13 @@ import asyncio
 import time
 import html
 from aiohttp import web
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command
+from aiogram import Bot, Dispatcher, types
 from aiogram.types import (
     ErrorEvent,
-    BotCommand,                          
-    InlineKeyboardMarkup, InlineKeyboardButton,
+    BotCommand,
     CallbackQuery,
-    ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
-from aiogram.webhook import aiohttp_server
 from supabase import create_client
 
 # ---------- Логирование ----------
@@ -31,10 +27,6 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("SUPABASE_URL и SUPABASE_KEY должны быть заданы")
 
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
-if not WEBHOOK_URL:
-    raise ValueError("WEBHOOK_URL не задан")
-
 ROOT_CODE = os.environ.get("ROOT_CODE")
 # ---------- Подключение к БД ----------
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -50,14 +42,6 @@ Actions = [
 
 ActionEdit = [
     "nameEdit", "ageEdit", "univerEdit", "aboutEdit", "requirementsEdit",
-]
-
-InlineKeyboardActions = [
-    "region", "city"
-]
-
-InlineKeyboardActionsEdit = [
-    "regionEdit", "cityEdit"
 ]
 
 # ---------- Словари ----------
@@ -228,10 +212,6 @@ for text in FormButtons:
     FormConfirmKeyboardBuilder.button(text=FormButtons[text])
 FormConfirmKeyboardBuilder.adjust(1, 2)
 FormConfirmKeyboard = FormConfirmKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
-# ---------- Клавиатура в анкете ----------
-FormReturnKeyboardBuilder = ReplyKeyboardBuilder()
-FormReturnKeyboardBuilder.button(text=ReturnButton["Return"])
-FormReturnKeyboard = FormReturnKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 
 # ---------- Inline Клавиатуры ----------
 # ---------- Выбор региона ----------
@@ -307,7 +287,7 @@ def validate_field(action: str, raw_text):
 # ---------- Функция для БД ----------
 #--------- Добавляем нового пользователя ----------
 def new_user_sync(user_id: int):
-    response = supabase.table("users").upsert(
+    supabase.table("users").upsert(
         {"user_id": user_id}, on_conflict="user_id"
     ).execute()
 
@@ -353,7 +333,7 @@ async def get_user_sync(user_id: int):
 
 # ---------- Удаляем пользователя ----------
 def delete_user_sync(user_id: int):
-    response = supabase.table("users").delete().eq("user_id", user_id).execute()
+    supabase.table("users").delete().eq("user_id", user_id).execute()
 
 # ---------- Добавляем просмотр ----------
 async def add_view(user_id: int, viewed_user_id: int, state: str = "unseen"):
@@ -433,25 +413,36 @@ async def print_profile(user_id=None, data=None):
         data = await get_user_sync(user_id)
     if data:
         name = html.escape(str(data.get("name") or ""))
-        age = data.get("age")
         univer = html.escape(str(data.get("univer") or ""))
         about = html.escape(str(data.get("about") or ""))
         requirements = html.escape(str(data.get("requirements") or ""))
+
+        # age может оказаться нечисловым, если строка была записана до
+        # появления валидации (старые тестовые данные) — не даём этому
+        # уронить показ профиля.
+        raw_age = data.get("age")
+        try:
+            age = int(raw_age) if raw_age is not None else None
+        except (TypeError, ValueError):
+            age = None
+
         yearword = ""
         if age is None:
-            age = ""
-        elif age < 5:
-            yearword = "года"
-        elif age < 21:
-            yearword = "лет"
-        elif age % 10 == 1 and age % 100 != 11:
-            yearword = "год"
-        elif age % 10 in [2, 3, 4] and age % 100 not in [12, 13, 14]:
-            yearword = "года"
+            age_display = ""
         else:
-            yearword = "лет"
+            age_display = age
+            if age < 5:
+                yearword = "года"
+            elif age < 21:
+                yearword = "лет"
+            elif age % 10 == 1 and age % 100 != 11:
+                yearword = "год"
+            elif age % 10 in [2, 3, 4] and age % 100 not in [12, 13, 14]:
+                yearword = "года"
+            else:
+                yearword = "лет"
         return (
-            f"<b>{name}</b>, {age} {yearword} | {univer}\n\n"
+            f"<b>{name}</b>, {age_display} {yearword} | {univer}\n\n"
             f"<b>О себе: </b>\n"
             f"<i>{about}</i>\n\n"
             f"<b>Пожелания к соседу: </b>\n"
@@ -495,7 +486,7 @@ async def cmd_start(message: types.Message):
     user_id = message.from_user.id
     username = message.from_user.username
     await asyncio.to_thread(new_user_sync, user_id)
-    await set_string_field(message.from_user.id, "username", message.from_user.username)
+    await set_string_field(user_id, "username", username)
     await add_view(user_id, user_id, state="seen") 
     await message.answer(Phrases['StartMessage'], parse_mode="HTML")
 
@@ -697,7 +688,7 @@ async def run_diagnostics() -> str:
         results.append(f"⏱️ 100 вызовов RPC get_unseen_users: {elapsed:.3f} сек (в среднем {elapsed/100:.3f} сек/вызов)")
     except Exception as e:
         results.append(f"❌ 100 вызовов RPC: {e}")
-    return "🔧 Диагностика Livether\n\n" + "\n".join(results)
+    return f"🔧 Диагностика {BOT_NAME}\n\n" + "\n".join(results)
 
 
 # ----------- Обработка команд -------------
@@ -827,7 +818,6 @@ async def cmd(message: types.Message):
 @dp.message()
 async def message(message: types.Message):
     mtext = message.text
-    user_id = message.from_user.id
     username = message.from_user.username
     if not(username):
         await message.answer("Чтобы пользоваться ботом установите имя пользователя в настройках Telegram")
@@ -957,30 +947,29 @@ async def callback_query(callback: CallbackQuery):
         await callback.answer()
         await bot.send_message(user_id, data)
 
-# ---------- Функция установки вебхука (будет вызвана при старте) ----------
-async def on_startup(app: web.Application):
-    await bot.delete_webhook(drop_pending_updates=True)
-    await bot.set_webhook(WEBHOOK_URL, allowed_updates=dp.resolve_used_update_types(), drop_pending_updates=True)
-    await set_commands(bot) 
-    
-
-# ---------- Создание aiohttp-приложения ----------
+# ---------- Создание aiohttp-приложения (только health-check для Render) ----------
 def create_app():
     app = web.Application()
     async def health(request):
         return web.Response(text="OK", status=200)
     app.router.add_get("/", health)
     app.router.add_get("/health", health)
-    webhook_requests = aiohttp_server.SimpleRequestHandler(
-        dispatcher=dp,
-        bot=bot,
-    )
-    webhook_requests.register(app, path="/webhook")
-    app.on_startup.append(on_startup)
     return app
 
 # ---------- Точка входа ----------
-if __name__ == "__main__":
+async def main():
+    await bot.delete_webhook(drop_pending_updates=True)
+    await set_commands(bot)
+
     app = create_app()
+    runner = web.AppRunner(app)
+    await runner.setup()
     port = int(os.environ.get("PORT", 5000))
-    web.run_app(app, host="0.0.0.0", port=port)
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    logger.info("Health-check server запущен на порту %s, запускаю polling...", port)
+
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
