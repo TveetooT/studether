@@ -59,7 +59,7 @@ DIAG_TEST_ID = -999999
 Actions = ["name", "age", "univer", "about", "requirements", "confirm"]
 ActionEdit = ["nameEdit", "ageEdit", "univerEdit", "aboutEdit", "requirementsEdit"]
 
-# ---------- Словари ----------
+# ---------- Словарь фраз (ТОЛЬКО ОДНО СООБЩЕНИЕ НА ШАГ) ----------
 Phrases = {
     "StartMessage": (
         "👋 Привет! Я бот <b>Livether</b> — твой помощник в поиске идеального соседа для совместной аренды! 🏠\n\n"
@@ -68,26 +68,20 @@ Phrases = {
         "Просто нажми /form или выбери пункт в меню."
         "\n УБЕДИТЕЛЬНАЯ ПРОСЬБА ДЛЯ ТЕСТИРОВЩИКОВ \n НЕ ПИШИТЕ ПОЖАЛУЙСТА \n 🤖',' говно жопа пенис); DROP TABLE vibe_code; -- \n В КАКИЕ ЛИБО ПОЛЯ АНКЕТЫ \n ЭТА ХРЕНЬ ЛОЖИТ ВЕБХУК И Я НЕ МОГУ ЕЁ ПАРСИТЬ/ПЕРЕХВАТЫВАТЬ \n НОРМАЛЬНЫЕ ЛЮДИ ТАКОЙ ХУЙНЁЙ Не ЗАНИМАЮТСЯ"
     ),
-    "nameMessage1": (
+    "nameMessage": (
         "📝 <b>Шаг 1 из 7:</b> Как тебя называть?\n\n"
         "✨ Меня зовут <b>Livether</b>. А ты? Под каким именем тебя будут видеть другие люди? "
         "Можешь указать имя, ник или даже прозвище — как тебе удобно! 😉"
     ),
-    "nameMessage2": "",
-
-    "ageMessage1": (
+    "ageMessage": (
         "📝 <b>Шаг 2 из 7:</b> Сколько тебе лет?\n\n"
         "🎂 А сколько тебе лет? Укажи цифру (например, 22)."
     ),
-    "ageMessage2": "",
-
-    "univerMessage1": (
+    "univerMessage": (
         "📝 <b>Шаг 3 из 7:</b> Где ты учишься? (учебное заведение)\n\n"
         "🎓 В каком вузе или колледже ты учишься? Напиши полное название или аббревиатуру."
     ),
-    "univerMessage2": "",
-
-    "aboutMessage1": (
+    "aboutMessage": (
         "📝 <b>Шаг 4 из 7:</b> Расскажи о себе (что ищешь, чем увлекаешься)\n\n"
         "🧑‍💻 Расскажи о себе поподробнее! 👇\n"
         "- Чем ты увлекаешься?\n"
@@ -96,9 +90,7 @@ Phrases = {
         "- Что ты ищешь в квартире и соседе?\n\n"
         "Это поможет найти идеального соседа! 😊"
     ),
-    "aboutMessage2": "",
-
-    "requirementsMessage1": (
+    "requirementsMessage": (
         "📝 <b>Шаг 5 из 7:</b> Каким ты хочешь видеть соседа? (пожелания)\n\n"
         "🧹 Теперь опиши, каким ты хотел(а) бы видеть своего соседа.\n\n"
         "Например:\n"
@@ -109,23 +101,19 @@ Phrases = {
         "- Животные (можно/нельзя)\n\n"
         "Будь честен — это поможет найти лучшего друга по квартире! 🤝"
     ),
-    "requirementsMessage2": "",
-
-    "regionMessage1": (
+    "regionMessage": (
         "📝 <b>Шаг 6 из 7:</b> Выбери <b>регион</b>, где ищешь жильё 🗺️\n\n"
         "🌍 Чтобы мы могли найти соседей в твоём городе, нужно сначала выбрать <b>регион</b>.\n"
         "Нажми на кнопку ниже, чтобы выбрать область, край или республику. 👇"
     ),
-    "regionMessage2": "",
-
-    "cityMessage1": (
+    "cityMessage": (
         "📝 <b>Шаг 7 из 7:</b> Теперь выбери <b>город</b> в этом регионе 🌆\n\n"
         "🏙️ Отлично! Теперь выбери <b>город</b>, в котором ты хочешь снимать квартиру.\n"
         "Список городов появится ниже — просто нажми на нужный. 📍"
     ),
-    "cityMessage2": "",
-
-    "confirmMessage": "✅ <b>Проверь свою анкету</b> — всё ли верно? Если есть ошибки, просто нажми «Заполнить заново».\n\n",
+    "confirmMessage": (
+        "✅ <b>Проверь свою анкету</b> — всё ли верно? Если есть ошибки, просто нажми «Заполнить заново».\n\n"
+    ),
     "FormSaved": "🎉 <b>Анкета успешно сохранена!</b>\n\nТеперь ты можешь искать соседей через /find или в меню. Удачи в поиске! 🍀",
     "Menu": "🏠 <b>Главное меню</b>\n\nВыбери действие на клавиатуре ниже:",
     "RootCode": "🔐 Доступ к админ-панели открыт.",
@@ -392,7 +380,7 @@ async def form_question(message: types.Message):
         await message.answer("Что-то пошло не так. Отправь /form, чтобы начать заново.")
         return
 
-    # Валидация введённых данных
+    # Валидация
     ok, error, value = validate_field(action, text)
     if not ok:
         await message.answer(f"⚠️ {error}")
@@ -404,22 +392,23 @@ async def form_question(message: types.Message):
     else:
         await set_string_field(user_id, action, value)
 
-    # ---- ИСПРАВЛЕНИЕ: отправка Message2 только если он не пуст ----
-    if await get_field(user_id, "form") != "true":
-        msg2 = Phrases.get(nextaction + "Message2")
-        if msg2 and msg2.strip():          # проверка на непустую строку
-            await message.answer(msg2, parse_mode="HTML")
-
+    # Подготовка клавиатуры (для региона/города)
     reply = None
     if nextaction == "region":
         reply = RegionInlineKeyboard
     elif nextaction == "city":
         reply = Cities.get(await get_field(user_id, "region"))
-    msg1 = Phrases.get(nextaction + "Message1")
-    if not msg1:
-        msg1 = f"Шаг {nextaction} (в разработке)"
-    await message.answer(msg1, reply_markup=reply, parse_mode="HTML")
+
+    # Отправляем ОДНО сообщение (без дублирующих Message2)
+    msg = Phrases.get(nextaction + "Message")
+    if not msg:
+        msg = f"Шаг {nextaction} (в разработке)"
+    await message.answer(msg, reply_markup=reply, parse_mode="HTML")
+
+    # Обновляем состояние
     await set_string_field(user_id, "action", nextaction)
+
+    # Если дошли до подтверждения – показываем анкету
     if nextaction == "confirm":
         profile_text = await print_profile(user_id=user_id)
         if profile_text:
@@ -483,7 +472,7 @@ async def start_form(message: types.Message, user_id: int):
         await message.answer(Phrases["RulesMessage"], reply_markup=RulesKeyboard, parse_mode="HTML")
         await set_string_field(user_id, "action", "rules")
     else:
-        await message.answer(Phrases['nameMessage1'], parse_mode="HTML")
+        await message.answer(Phrases['nameMessage'], parse_mode="HTML")
         await set_string_field(user_id, "action", "name")
 
 async def set_commands(bot: Bot):
@@ -593,8 +582,7 @@ async def text(message: types.Message):
     # 3. Обработка состояний (action)
     if action == "rules":
         if text == RulesButtons["Accept"]:
-            await message.answer(Phrases['nameMessage1'], parse_mode="HTML")
-            await message.answer(Phrases['nameMessage2'], parse_mode="HTML")
+            await message.answer(Phrases['nameMessage'], parse_mode="HTML")
             await set_string_field(user_id, "action", "name")
         else:
             await message.answer("Пожалуйста, подтверди согласие с правилами, чтобы продолжить.", reply_markup=RulesKeyboard)
@@ -687,7 +675,19 @@ async def cmd(message: types.Message):
 # ---------- Диагностика ----------
 async def run_diagnostics() -> str:
     results = []
-    # ... (диагностика без изменений, опущена для краткости)
+    try:
+        # Проверка подключения к БД
+        resp = await asyncio.to_thread(lambda: supabase.table("users").select("count", count="exact").limit(1).execute())
+        results.append("✅ БД доступна")
+    except Exception as e:
+        results.append(f"❌ Ошибка БД: {e}")
+
+    try:
+        me = await bot.get_me()
+        results.append(f"✅ Бот @{me.username} активен")
+    except Exception as e:
+        results.append(f"❌ Ошибка бота: {e}")
+
     return f"🔧 Диагностика {BOT_NAME}\n\n" + "\n".join(results)
 
 def clear_all_data_sync():
@@ -741,9 +741,8 @@ async def callback_query(callback: CallbackQuery):
         else:
             await set_string_field(user_id, "action", "cityEdit")
         await callback.answer()
-        if form != "true":
-            await callback.message.answer(Phrases["cityMessage2"], parse_mode="HTML")
-        await callback.message.answer(Phrases["cityMessage1"], reply_markup=Cities[region_name], parse_mode="HTML")
+        # Отправляем только одно сообщение с выбором города (без cityMessage2)
+        await callback.message.answer(Phrases["cityMessage"], reply_markup=Cities[region_name], parse_mode="HTML")
 
     elif data.startswith("city_"):
         city_name = data[5:]
@@ -768,7 +767,8 @@ async def callback_query(callback: CallbackQuery):
             reply = RegionInlineKeyboard
             action = "region"
         await set_string_field(user_id, "action", action+"Edit")
-        await callback.message.answer(Phrases[action+"Message1"], reply_markup=reply, parse_mode="HTML")
+        # Отправляем одно сообщение (без Message2)
+        await callback.message.answer(Phrases[action+"Message"], reply_markup=reply, parse_mode="HTML")
         await callback.answer()
 
     elif data.startswith("view_"):
@@ -1050,7 +1050,6 @@ async def admin_ban(request):
     if not is_admin(request):
         return web.HTTPFound("/admin")
     user_id = int(request.match_info['user_id'])
-    # Получаем текущий статус бана
     def _get():
         resp = supabase.table("users").select("banned").eq("user_id", user_id).execute()
         return resp.data[0]["banned"] if resp.data else None
