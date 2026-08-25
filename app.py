@@ -927,8 +927,9 @@ async def admin_login(request):
             return resp
         else:
             return web.Response(text="Неверный код", status=403)
+
     # GET – показываем форму
-    html = """
+    html_content = """
     <!DOCTYPE html>
     <html><head><meta charset="utf-8"><title>Вход в админку</title>
     <style>body{font-family:sans-serif;max-width:400px;margin:40px auto;padding:20px;background:#f0f2f5;}
@@ -942,7 +943,7 @@ async def admin_login(request):
     </form>
     </body></html>
     """
-    return web.Response(text=html, content_type='text/html')
+    return web.Response(text=html_content, content_type='text/html')
 
 async def admin_users(request):
     if not is_admin(request):
@@ -954,7 +955,7 @@ async def admin_users(request):
         resp = supabase.table("users").select("*").order("user_id").range(offset, offset + per_page - 1).execute()
         return resp.data
     users = await asyncio.to_thread(_list)
-    # Генерация HTML таблицы
+
     rows = ""
     for u in users:
         rows += f"""
@@ -978,7 +979,8 @@ async def admin_users(request):
             </td>
         </tr>
         """
-    html = f"""
+
+    html_content = f"""
     <!DOCTYPE html>
     <html><head><meta charset="utf-8"><title>Пользователи</title>
     <style>
@@ -1003,7 +1005,7 @@ async def admin_users(request):
         <p><a href="/admin/stats">📊 Расширенная статистика</a></p>
     </body></html>
     """
-    return web.Response(text=html, content_type='text/html')
+    return web.Response(text=html_content, content_type='text/html')
 
 async def admin_delete(request):
     if not is_admin(request):
@@ -1029,7 +1031,6 @@ async def admin_stats(request):
     if not is_admin(request):
         return web.HTTPFound("/admin")
     def _stats():
-        # расширенная статистика для админа
         total_users = supabase.table("users").select("user_id", count="exact").execute().count
         banned_users = supabase.table("users").select("user_id", count="exact").eq("banned", "true").execute().count
         reports_gt5 = supabase.table("users").select("user_id", count="exact").gt("reports", 5).execute().count
@@ -1043,7 +1044,8 @@ async def admin_stats(request):
             "likes": likes_total,
         }
     data = await asyncio.to_thread(_stats)
-    html = f"""
+
+    html_content = f"""
     <!DOCTYPE html>
     <html><head><meta charset="utf-8"><title>Админ-статистика</title>
     <style>body{{font-family:sans-serif;max-width:600px;margin:40px auto;padding:20px;background:#f0f2f5;}}
@@ -1060,7 +1062,7 @@ async def admin_stats(request):
         <p><a href="/admin/users">← Назад к пользователям</a></p>
     </body></html>
     """
-    return web.Response(text=html, content_type='text/html')
+    return web.Response(text=html_content, content_type='text/html')
 
 async def admin_logout(request):
     resp = web.HTTPFound("/admin")
