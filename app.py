@@ -3,23 +3,25 @@ import logging
 import asyncio
 import time
 import html
+import random
+from datetime import datetime, timezone
 from aiohttp import web
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command
+from aiogram import Bot, Dispatcher, types
 from aiogram.types import (
     ErrorEvent,
-    BotCommand,                          
-    InlineKeyboardMarkup, InlineKeyboardButton,
+    BotCommand,
     CallbackQuery,
-    ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
-from aiogram.webhook import aiohttp_server
 from supabase import create_client
+
+# ---------- Импорт регионов ----------
+from regions import Regions
 
 # ---------- Логирование ----------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 # ---------- Переменные окружения ----------
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -36,28 +38,24 @@ if not WEBHOOK_URL:
     raise ValueError("WEBHOOK_URL не задан")
 
 ROOT_CODE = os.environ.get("ROOT_CODE")
+
+# ---------- Бот и диспетчер ----------
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
+
 # ---------- Подключение к БД ----------
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ---------- Константы ----------
 BOT_NAME = "Livether"
-DIAG_TEST_ID = -999999  # служебный ID для self-test, Telegram user_id всегда положительные
+DIAG_TEST_ID = -999999
 
 # ---------- Списки ----------
 Actions = [
     "name", "age", "univer", "about", "requirements", "confirm"
 ]
-
 ActionEdit = [
     "nameEdit", "ageEdit", "univerEdit", "aboutEdit", "requirementsEdit",
-]
-
-InlineKeyboardActions = [
-    "region", "city"
-]
-
-InlineKeyboardActionsEdit = [
-    "regionEdit", "cityEdit"
 ]
 
 # ---------- Словари ----------
@@ -68,7 +66,6 @@ Phrases = {
         "Чтобы начать, заполни анкету — это займёт всего пару минут! 📝\n"
         "Просто нажми /form или выбери пункт в меню."
     ),
-
     "nameMessage1": "📝 <b>Шаг 1 из 7:</b> Как тебя называть?",
     "ageMessage1": "📝 <b>Шаг 2 из 7:</b> Сколько тебе лет?",
     "univerMessage1": "📝 <b>Шаг 3 из 7:</b> Где ты учишься? (учебное заведение)",
@@ -76,7 +73,6 @@ Phrases = {
     "requirementsMessage1": "📝 <b>Шаг 5 из 7:</b> Каким ты хочешь видеть соседа? (пожелания)",
     "regionMessage1": "📝 <b>Шаг 6 из 7:</b> Выбери <b>регион</b>, где ищешь жильё 🗺️",
     "cityMessage1": "📝 <b>Шаг 7 из 7:</b> Теперь выбери <b>город</b> в этом регионе 🌆",
-
     "nameMessage2": (
         "✨ Меня зовут <b>Livether</b>. А ты? Под каким именем тебя будут видеть другие люди? "
         "Можешь указать имя, ник или даже прозвище — как тебе удобно! 😉"
@@ -109,20 +105,11 @@ Phrases = {
         "🏙️ Отлично! Теперь выбери <b>город</b>, в котором ты хочешь снимать квартиру.\n"
         "Список городов появится ниже — просто нажми на нужный. 📍"
     ),
-
     "confirmMessage": "✅ <b>Проверь свою анкету</b> — всё ли верно? Если есть ошибки, просто нажми «Заполнить заново».\n\n",
-
     "FormSaved": "🎉 <b>Анкета успешно сохранена!</b>\n\nТеперь ты можешь искать соседей через /find или в меню. Удачи в поиске! 🍀",
-
     "Menu": "🏠 <b>Главное меню</b>\n\nВыбери действие на клавиатуре ниже:",
-    
     "RootCode": "🔐 Доступ к админ-панели открыт.",
-
-    "FAQMessage": 
-        "❓ ЧаВо\n\n"
-        "В разработке...\n\n"
-        "По вопросам и предложениям: @tveetoo",
-
+    "FAQMessage": "❓ ЧаВо\n\nВ разработке...\n\nПо вопросам и предложениям: @tveetoo",
     "RulesMessage": (
         "📋 <b>Прежде чем начать</b>\n\n"
         "1️⃣ Запрещено указывать чужие персональные данные или выдавать себя за другого человека.\n"
@@ -143,26 +130,20 @@ Phrases = {
         "1️⃣6️⃣ Бот не проверяет достоверность указанных данных — будьте внимательны при личной встрече.\n"
         "1️⃣7️⃣ Изменение города или анкеты может обновить список анкет, доступных для поиска.\n\n"
         "Нажми «Принимаю», чтобы продолжить заполнение анкеты."
-)
-
+    )
 }
 
 # ---------- Кнопки ----------
-# ---------- главное меню ----------
 MainButtons = {
     "Profile": "👤 Моя анкета",
     "Find": "🔍 Найти сожителя",
     "Likes": "📬 Запросы на сожительство",
     "FAQ": "❓ ЧаВо",
 }
-
-# ---------- Подтверждение анкеты ----------
 FormButtons = {
     "Confirm": "Всё хорошо",
     "Restart": "Заполнить заново",
 }
-
-# ---------- Редактирование анкеты ----------
 EditButtons = {
     "name": "Изменить имя",
     "age": "Изменить возраст",
@@ -170,17 +151,12 @@ EditButtons = {
     "about": "Изменить описание",
     "requirements": "Изменить пожелания",
     "city": "Изменить город",
-
 }
-
-# ---------- Просмотр анкеты ----------
 ViewButtons = {
     "like": "👍",
     "dislike": "👎",
     "report": "⚠️ Пожаловаться"
 }
-
-# ---------- Кнопка назад ----------
 ReturnButton = {
     "Return": "⬅️ Назад",
 }
@@ -205,66 +181,56 @@ CommandMenu = {
     "faq": "ЧаВо"
 }
 
-# ---------- Словарь регионов и городов ---------- 
-Regions = {"Республика Адыгея": ["Майкоп", "Адыгейск"], "Республика Алтай": ["Горно-Алтайск"], "Республика Башкортостан": ["Уфа", "Агидель", "Баймак", "Белебей", "Белорецк", "Бирск", "Благовещенск", "Давлеканово", "Дюртюли", "Ишимбай", "Кумертау", "Межгорье", "Мелеуз", "Нефтекамск", "Октябрьский", "Салават", "Сибай", "Стерлитамак", "Туймазы", "Учалы", "Янаул"], "Республика Бурятия": ["Улан-Удэ", "Бабушкин", "Гусиноозёрск", "Закаменск", "Кяхта", "Северобайкальск"], "Республика Дагестан": ["Махачкала", "Буйнакск", "Дагестанские Огни", "Дербент", "Избербаш", "Каспийск", "Кизилюрт", "Кизляр", "Хасавюрт", "Южно-Сухокумск"], "Республика Ингушетия": ["Магас", "Карабулак", "Малгобек", "Назрань"], "Кабардино-Балкарская Республика": ["Нальчик", "Баксан", "Майский", "Нарткала", "Прохладный", "Терек", "Тырныауз", "Чегем"], "Республика Калмыкия": ["Элиста", "Городовиковск", "Лагань"], "Карачаево-Черкесская Республика": ["Черкесск", "Карачаевск", "Теберда", "Усть-Джегута"], "Республика Карелия": ["Петрозаводск", "Беломорск", "Кемь", "Кондопога", "Костомукша", "Лахденпохья", "Медвежьегорск", "Олонец", "Питкяранта", "Пудож", "Сегежа", "Сортавала", "Суоярви"], "Республика Коми": ["Сыктывкар", "Воркута", "Вуктыл", "Емва", "Инта", "Микунь", "Печора", "Сосногорск", "Усинск", "Ухта"], "Республика Крым": ["Симферополь", "Алупка", "Алушта", "Армянск", "Бахчисарай", "Белогорск", "Джанкой", "Евпатория", "Керчь", "Красноперекопск", "Саки", "Старый Крым", "Судак", "Феодосия", "Щёлкино", "Ялта"], "Республика Марий Эл": ["Йошкар-Ола", "Волжск", "Звенигово", "Козьмодемьянск"], "Республика Мордовия": ["Саранск", "Ардатов", "Инсар", "Ковылкино", "Краснослободск", "Рузаевка", "Темников"], "Республика Саха (Якутия)": ["Якутск", "Алдан", "Верхоянск", "Вилюйск", "Ленск", "Мирный", "Нерюнгри", "Нюрба", "Олёкминск", "Покровск", "Среднеколымск", "Томмот", "Удачный"], "Республика Северная Осетия — Алания": ["Владикавказ", "Алагир", "Ардон", "Беслан", "Дигора", "Моздок"], "Республика Татарстан": ["Казань", "Азнакаево", "Альметьевск", "Арск", "Бавлы", "Болгар", "Бугульма", "Буинск", "Елабуга", "Заинск", "Зеленодольск", "Иннополис", "Лаишево", "Лениногорск", "Мамадыш", "Менделеевск", "Мензелинск", "Набережные Челны", "Нижнекамск", "Нурлат", "Тетюши", "Чистополь"], "Республика Тыва": ["Кызыл", "Ак-Довурак", "Туран", "Чадан", "Шагонар"], "Удмуртская Республика": ["Ижевск", "Воткинск", "Глазов", "Камбарка", "Можга", "Сарапул"], "Республика Хакасия": ["Абакан", "Абаза", "Саяногорск", "Сорск", "Черногорск"], "Чеченская Республика": ["Грозный", "Аргун", "Гудермес", "Курчалой", "Урус-Мартан", "Шали"], "Чувашская Республика": ["Чебоксары", "Алатырь", "Канаш", "Козловка", "Мариинский Посад", "Новочебоксарск", "Цивильск", "Шумерля", "Ядрин"], "Алтайский край": ["Барнаул", "Алейск", "Белокуриха", "Бийск", "Горняк", "Заринск", "Змеиногорск", "Камень-на-Оби", "Новоалтайск", "Рубцовск", "Славгород", "Яровое"], "Забайкальский край": ["Чита", "Балей", "Борзя", "Краснокаменск", "Могоча", "Нерчинск", "Петровск-Забайкальский", "Сретенск", "Хилок", "Шилка"], "Камчатский край": ["Петропавловск-Камчатский", "Вилючинск", "Елизово"], "Краснодарский край": ["Краснодар", "Абинск", "Анапа", "Апшеронск", "Армавир", "Белореченск", "Геленджик", "Горячий Ключ", "Гулькевичи", "Ейск", "Кореновск", "Кропоткин", "Крымск", "Лабинск", "Новокубанск", "Новороссийск", "Приморско-Ахтарск", "Славянск-на-Кубани", "Сочи", "Темрюк", "Тимашёвск", "Тихорецк", "Туапсе", "Усть-Лабинск", "Хадыженск"], "Красноярский край": ["Красноярск", "Артёмовск", "Ачинск", "Боготол", "Бородино", "Дивногорск", "Дудинка", "Енисейск", "Железногорск", "Заозёрный", "Зеленогорск", "Игарка", "Иланский", "Канск", "Кодинск", "Лесосибирск", "Минусинск", "Назарово", "Норильск", "Сосновоборск", "Ужур", "Уяр", "Шарыпово"], "Пермский край": ["Пермь", "Александровск", "Березники", "Верещагино", "Горнозаводск", "Гремячинск", "Губаха", "Добрянка", "Кизел", "Красновишерск", "Краснокамск", "Кудымкар", "Кунгур", "Лысьва", "Нытва", "Оса", "Оханск", "Очёр", "Соликамск", "Усолье", "Чайковский", "Чердынь", "Чёрмоз", "Чернушка", "Чусовой"], "Приморский край": ["Владивосток", "Арсеньев", "Артём", "Большой Камень", "Дальнегорск", "Дальнереченск", "Лесозаводск", "Находка", "Партизанск", "Спасск-Дальний", "Уссурийск", "Фокино"], "Ставропольский край": ["Ставрополь", "Благодарный", "Будённовск", "Георгиевск", "Ессентуки", "Железноводск", "Зеленокумск", "Изобильный", "Ипатово", "Кисловодск", "Лермонтов", "Минеральные Воды", "Михайловск", "Невинномысск", "Нефтекумск", "Новоалександровск", "Новопавловск", "Пятигорск", "Светлоград"], "Хабаровский край": ["Хабаровск", "Амурск", "Бикин", "Вяземский", "Комсомольск-на-Амуре", "Николаевск-на-Амуре", "Советская Гавань"], "Амурская область": ["Благовещенск", "Белогорск", "Завитинск", "Зея", "Райчихинск", "Свободный", "Сковородино", "Тында", "Циолковский", "Шимановск"], "Архангельская область": ["Архангельск", "Вельск", "Каргополь", "Коряжма", "Котлас", "Мезень", "Мирный", "Новодвинск", "Няндома", "Онега", "Северодвинск", "Сольвычегодск", "Шенкурск"], "Астраханская область": ["Астрахань", "Ахтубинск", "Знаменск", "Камызяк", "Нариманов", "Харабали"], "Белгородская область": ["Белгород", "Алексеевка", "Бирюч", "Валуйки", "Грайворон", "Губкин", "Короча", "Новый Оскол", "Старый Оскол", "Строитель", "Шебекино"], "Брянская область": ["Брянск", "Дятьково", "Жуковка", "Злынка", "Карачев", "Клинцы", "Мглин", "Новозыбков", "Почеп", "Севск", "Стародуб", "Сураж", "Трубчевск", "Унеча"], "Владимирская область": ["Владимир", "Александров", "Вязники", "Гороховец", "Гусь-Хрустальный", "Камешково", "Карабаново", "Киржач", "Ковров", "Кольчугино", "Костерево", "Курлово", "Лакинск", "Меленки", "Муром", "Петушки", "Покров", "Радужный", "Собинка", "Струнино", "Судогда", "Суздаль", "Юрьев-Польский"], "Волгоградская область": ["Волгоград", "Волжский", "Дубовка", "Жирновск", "Калач-на-Дону", "Камышин", "Котельниково", "Котово", "Краснослободск", "Ленинск", "Михайловка", "Николаевск", "Новоаннинский", "Палласовка", "Петров Вал", "Серафимович", "Суровикино", "Урюпинск", "Фролово"], "Вологодская область": ["Вологда", "Бабаево", "Белозерск", "Великий Устюг", "Вытегра", "Грязовец", "Кадников", "Кириллов", "Красавино", "Никольск", "Сокол", "Тотьма", "Устюжна", "Харовск", "Череповец"], "Воронежская область": ["Воронеж", "Бобров", "Богучар", "Борисоглебск", "Бутурлиновка", "Калач", "Лиски", "Нововоронеж", "Новохопёрск", "Острогожск", "Павловск", "Поворино", "Россошь", "Семилуки", "Эртиль"], "Ивановская область": ["Иваново", "Вичуга", "Гаврилов Посад", "Заволжск", "Кинешма", "Комсомольск", "Кохма", "Наволоки", "Плёс", "Приволжск", "Пучеж", "Родники", "Тейково", "Фурманов", "Шуя", "Южа", "Юрьевец"], "Иркутская область": ["Иркутск", "Алзамай", "Ангарск", "Байкальск", "Бирюсинск", "Бодайбо", "Братск", "Вихоревка", "Железногорск-Илимский", "Зима", "Киренск", "Нижнеудинск", "Саянск", "Свирск", "Слюдянка", "Тайшет", "Тулун", "Усолье-Сибирское", "Усть-Илимск", "Усть-Кут", "Черемхово", "Шелехов"], "Калининградская область": ["Калининград", "Багратионовск", "Балтийск", "Гвардейск", "Гурьевск", "Гусев", "Зеленоградск", "Краснознаменск", "Ладушкин", "Мамоново", "Неман", "Нестеров", "Озёрск", "Пионерский", "Полесск", "Правдинск", "Приморск", "Светлогорск", "Светлый", "Славск", "Советск", "Черняховск"], "Калужская область": ["Калуга", "Балабаново", "Белоусово", "Боровск", "Ермолино", "Жиздра", "Жуков", "Киров", "Козельск", "Кондрово", "Кремёнки", "Людиново", "Малоярославец", "Медынь", "Мещовск", "Мосальск", "Обнинск", "Сосенский", "Спас-Деменск", "Сухиничи", "Таруса", "Юхнов"], "Кемеровская область — Кузбасс": ["Кемерово", "Анжеро-Судженск", "Белово", "Берёзовский", "Гурьевск", "Калтан", "Киселёвск", "Ленинск-Кузнецкий", "Мариинск", "Междуреченск", "Мыски", "Новокузнецк", "Осинники", "Полысаево", "Прокопьевск", "Салаир", "Тайга", "Таштагол", "Топки", "Юрга"], "Кировская область": ["Киров", "Белая Холуница", "Вятские Поляны", "Зуевка", "Кирово-Чепецк", "Кирс", "Котельнич", "Луза", "Малмыж", "Мураши", "Нолинск", "Омутнинск", "Орлов", "Слободской", "Советск", "Сосновка", "Уржум", "Яранск"], "Костромская область": ["Кострома", "Буй", "Волгореченск", "Галич", "Кологрив", "Макарьев", "Мантурово", "Нерехта", "Нея", "Солигалич", "Чухлома", "Шарья"], "Курганская область": ["Курган", "Далматово", "Катайск", "Куртамыш", "Макушино", "Петухово", "Шадринск", "Шумиха", "Щучье"], "Курская область": ["Курск", "Дмитриев", "Железногорск", "Курчатов", "Льгов", "Обоянь", "Рыльск", "Суджа", "Фатеж", "Щигры"], "Ленинградская область": ["Санкт-Петербург", "Бокситогорск", "Волосово", "Волхов", "Всеволожск", "Выборг", "Высоцк", "Гатчина", "Ивангород", "Каменногорск", "Кингисепп", "Кириши", "Кировск", "Коммунар", "Кудрово", "Лодейное Поле", "Луга", "Любань", "Мурино", "Никольское", "Новая Ладога", "Отрадное", "Пикалёво", "Подпорожье", "Приморск", "Приозерск", "Светогорск", "Сертолово", "Сланцы", "Сосновый Бор", "Тихвин", "Тосно", "Шлиссельбург"], "Липецкая область": ["Липецк", "Грязи", "Данков", "Елец", "Задонск", "Лебедянь", "Усмань", "Чаплыгин"], "Магаданская область": ["Магадан", "Сусуман"], "Московская область": ["Москва", "Апрелевка", "Балашиха", "Белоозёрский", "Бронницы", "Верея", "Видное", "Волоколамск", "Воскресенск", "Высоковск", "Голицыно", "Дедовск", "Дзержинский", "Дмитров", "Долгопрудный", "Домодедово", "Дрезна", "Дубна", "Егорьевск", "Жуковский", "Зарайск", "Звенигород", "Ивантеевка", "Истра", "Кашира", "Клин", "Коломна", "Королёв", "Котельники", "Красноармейск", "Красногорск", "Краснозаводск", "Краснознаменск", "Кубинка", "Куровское", "Лыткарино", "Люберцы", "Можайск", "Мытищи", "Наро-Фоминск", "Ногинск", "Одинцово", "Озёры", "Орехово-Зуево", "Павловский Посад", "Пересвет", "Подольск", "Протвино", "Пушкино", "Пущино", "Раменское", "Реутов", "Рошаль", "Руза", "Сергиев Посад", "Серпухов", "Солнечногорск", "Старая Купавна", "Ступино", "Талдом", "Фрязино", "Химки", "Хотьково", "Черноголовка", "Чехов", "Шатура", "Щёлково", "Электрогорск", "Электросталь", "Электроугли", "Юбилейный", "Яхрома"], "Мурманская область": ["Мурманск", "Апатиты", "Гаджиево", "Заозёрск", "Заполярный", "Кандалакша", "Кировск", "Ковдор", "Кола", "Мончегорск", "Оленегорск", "Островной", "Полярные Зори", "Полярный", "Североморск", "Снежногорск"], "Нижегородская область": ["Нижний Новгород", "Арзамас", "Балахна", "Богородск", "Бор", "Ветлуга", "Володарск", "Ворсма", "Выкса", "Горбатов", "Городец", "Дзержинск", "Заволжье", "Княгинино", "Кстово", "Кулебаки", "Лукоянов", "Лысково", "Навашино", "Павлово", "Первомайск", "Перевоз", "Саров", "Семёнов", "Сергач", "Урень", "Чкаловск", "Шахунья"], "Новгородская область": ["Великий Новгород", "Боровичи", "Валдай", "Малая Вишера", "Окуловка", "Пестово", "Сольцы", "Старая Русса", "Холм", "Чудово"], "Новосибирская область": ["Новосибирск", "Барабинск", "Бердск", "Болотное", "Искитим", "Карасук", "Каргат", "Куйбышев", "Купино", "Обь", "Татарск", "Тогучин", "Черепаново", "Чулым"], "Омская область": ["Омск", "Исилькуль", "Калачинск", "Называевск", "Тара", "Тюкалинск"], "Оренбургская область": ["Оренбург", "Абдулино", "Бугуруслан", "Бузулук", "Гай", "Кувандык", "Медногорск", "Новотроицк", "Орск", "Соль-Илецк", "Сорочинск", "Ясный"], "Орловская область": ["Орёл", "Болхов", "Дмитровск", "Ливны", "Малоархангельск", "Мценск", "Новосиль"], "Пензенская область": ["Пенза", "Белинский", "Городище", "Заречный", "Каменка", "Кузнецк", "Нижний Ломов", "Никольск", "Сердобск", "Спасск", "Сурск"], "Псковская область": ["Псков", "Великие Луки", "Гдов", "Дно", "Невель", "Новоржев", "Новосокольники", "Опочка", "Остров", "Печоры", "Порхов", "Пустошка", "Пыталово", "Себеж"], "Ростовская область": ["Ростов-на-Дону", "Азов", "Аксай", "Батайск", "Белая Калитва", "Волгодонск", "Гуково", "Донецк", "Зверево", "Зерноград", "Каменск-Шахтинский", "Константиновск", "Красный Сулин", "Миллерово", "Морозовск", "Новочеркасск", "Новошахтинск", "Пролетарск", "Сальск", "Семикаракорск", "Таганрог", "Цимлянск", "Шахты"], "Рязанская область": ["Рязань", "Касимов", "Кораблино", "Михайлов", "Новомичуринск", "Рыбное", "Ряжск", "Сасово", "Скопин", "Спас-Клепики", "Спасск-Рязанский", "Шацк"], "Самарская область": ["Самара", "Жигулёвск", "Кинель", "Нефтегорск", "Новокуйбышевск", "Октябрьск", "Отрадный", "Похвистнево", "Сызрань", "Тольятти", "Чапаевск"], "Саратовская область": ["Саратов", "Аркадак", "Аткарск", "Балаково", "Балашов", "Вольск", "Ершов", "Калининск", "Красноармейск", "Красный Кут", "Маркс", "Новоузенск", "Петровск", "Пугачёв", "Ртищево", "Хвалынск", "Шиханы", "Энгельс"], "Сахалинская область": ["Южно-Сахалинск", "Александровск-Сахалинский", "Анива", "Долинск", "Корсаков", "Курильск", "Макаров", "Невельск", "Оха", "Поронайск", "Северо-Курильск", "Томари", "Углегорск", "Холмск", "Шахтёрск"], "Свердловская область": ["Екатеринбург", "Алапаевск", "Арамиль", "Артёмовский", "Асбест", "Берёзовский", "Богданович", "Верхний Тагил", "Верхняя Пышма", "Верхняя Салда", "Верхняя Тура", "Верхотурье", "Волчанск", "Дегтярск", "Заречный", "Ивдель", "Ирбит", "Каменск-Уральский", "Камышлов", "Карпинск", "Качканар", "Кировград", "Краснотурьинск", "Красноуральск", "Красноуфимск", "Кушва", "Лесной", "Михайловск", "Невьянск", "Нижние Серги", "Нижний Тагил", "Нижняя Салда", "Нижняя Тура", "Новая Ляля", "Новоуральск", "Первоуральск", "Полевской", "Ревда", "Реж", "Североуральск", "Серов", "Среднеуральск", "Сухой Лог", "Сысерть", "Тавда", "Талица", "Туринск"], "Смоленская область": ["Смоленск", "Велиж", "Вязьма", "Гагарин", "Демидов", "Десногорск", "Дорогобуж", "Духовщина", "Ельня", "Починок", "Рославль", "Рудня", "Сафоново", "Сычёвка", "Ярцево"], "Тамбовская область": ["Тамбов", "Жердевка", "Кирсанов", "Котовск", "Мичуринск", "Моршанск", "Рассказово", "Уварово"], "Тверская область": ["Тверь", "Андреаполь", "Бежецк", "Белый", "Бологое", "Весьегонск", "Вышний Волочёк", "Западная Двина", "Зубцов", "Калязин", "Кашин", "Кимры", "Конаково", "Красный Холм", "Кувшиново", "Лихославль", "Нелидово", "Осташков", "Ржев", "Старица", "Торжок", "Торопец", "Удомля"], "Томская область": ["Томск", "Асино", "Кедровый", "Колпашево", "Северск", "Стрежевой"], "Тульская область": ["Тула", "Алексин", "Белёв", "Богородицк", "Болохово", "Венёв", "Донской", "Ефремов", "Кимовск", "Киреевск", "Липки", "Новомосковск", "Плавск", "Советск", "Суворов", "Узловая", "Чекалин", "Щёкино", "Ясногорск"], "Тюменская область": ["Тюмень", "Заводоуковск", "Ишим", "Тобольск", "Ялуторовск"], "Ульяновская область": ["Ульяновск", "Барыш", "Димитровград", "Инза", "Новоульяновск", "Сенгилей"], "Челябинская область": ["Челябинск", "Аша", "Бакал", "Верхнеуральск", "Верхний Уфалей", "Еманжелинск", "Златоуст", "Карабаш", "Карталы", "Касли", "Катав-Ивановск", "Копейск", "Коркино", "Куса", "Кыштым", "Магнитогорск", "Миасс", "Миньяр", "Нязепетровск", "Озёрск", "Пласт", "Сатка", "Сим", "Снежинск", "Трёхгорный", "Троицк", "Усть-Катав", "Чебаркуль", "Южноуральск", "Юрюзань"], "Ярославская область": ["Ярославль", "Гаврилов-Ям", "Данилов", "Любим", "Мышкин", "Переславль-Залесский", "Пошехонье", "Ростов", "Рыбинск", "Тутаев", "Углич"], "Севастополь": ["Севастополь"], "Ненецкий автономный округ": ["Нарьян-Мар"], "Ханты-Мансийский автономный округ — Югра": ["Ханты-Мансийск", "Белоярский", "Когалым", "Лангепас", "Лянтор", "Мегион", "Нефтеюганск", "Нижневартовск", "Нягань", "Покачи", "Пыть-Ях", "Радужный", "Советский", "Сургут", "Урай", "Югорск"], "Чукотский автономный округ": ["Анадырь", "Билибино", "Певек"], "Ямало-Ненецкий автономный округ": ["Салехард", "Губкинский", "Лабытнанги", "Муравленко", "Надым", "Новый Уренгой", "Ноябрьск", "Тарко-Сале"], "Донецкая Народная Республика": ["Донецк", "Горловка", "Дебальцево", "Докучаевск", "Енакиево", "Ждановка", "Кировское", "Макеевка", "Мариуполь", "Снежное", "Торез", "Углегорск", "Харцызск", "Шахтёрск", "Ясиноватая"], "Луганская Народная Республика": ["Луганск", "Алмазная", "Алчевск", "Антрацит", "Брянка", "Кировск", "Краснодон", "Красный Луч", "Лисичанск", "Первомайск", "Ровеньки", "Рубежное", "Свердловск", "Северодонецк", "Стаханов", "Суходольск"], "Запорожская область": ["Мелитополь", "Бердянск", "Токмак", "Энергодар", "Пологи", "Васильевка", "Каменка-Днепровская"], "Херсонская область": ["Херсон", "Геническ", "Каховка", "Новая Каховка", "Скадовск", "Голая Пристань", "Алёшки"]}
+# ---------- Регионы ----------
+from regions import Regions
+region_keys = list(Regions.keys())
 
 # ---------- Reply Клавиатуры ----------
-# ---------- Главная клавиатура ----------
 MainReplyKeyboardBuilder = ReplyKeyboardBuilder()
-for text in MainButtons:
-    MainReplyKeyboardBuilder.button(text=MainButtons[text])
-MainReplyKeyboardBuilder.adjust(1, 2) #Столбцы, ряды
+for text in MainButtons.values():
+    MainReplyKeyboardBuilder.button(text=text)
+MainReplyKeyboardBuilder.adjust(1, 2)
 MainMenuKeyboard = MainReplyKeyboardBuilder.as_markup(resize_keyboard=True)
-# ---------- Клавиатура правил перед анкетой ----------
-RulesButtons = {
-    "Accept": "✅ Принимаю",
-}
+
+RulesButtons = {"Accept": "✅ Принимаю"}
 RulesKeyboardBuilder = ReplyKeyboardBuilder()
 RulesKeyboardBuilder.button(text=RulesButtons["Accept"])
 RulesKeyboard = RulesKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
-# ---------- Клавиатура в конце анкеты ----------
+
 FormConfirmKeyboardBuilder = ReplyKeyboardBuilder()
-for text in FormButtons:
-    FormConfirmKeyboardBuilder.button(text=FormButtons[text])
+for text in FormButtons.values():
+    FormConfirmKeyboardBuilder.button(text=text)
 FormConfirmKeyboardBuilder.adjust(1, 2)
 FormConfirmKeyboard = FormConfirmKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
-# ---------- Клавиатура в анкете ----------
-FormReturnKeyboardBuilder = ReplyKeyboardBuilder()
-FormReturnKeyboardBuilder.button(text=ReturnButton["Return"])
-FormReturnKeyboard = FormReturnKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 
 # ---------- Inline Клавиатуры ----------
-# ---------- Выбор региона ----------
 RegionInlineKeyboardBuilder = InlineKeyboardBuilder()
-region_keys = list(Regions.keys())  
 for idx, region in enumerate(region_keys):
-    RegionInlineKeyboardBuilder.button(text=region, callback_data=f"reg_{idx}" )
+    RegionInlineKeyboardBuilder.button(text=region, callback_data=f"reg_{idx}")
 RegionInlineKeyboardBuilder.adjust(1)
 RegionInlineKeyboard = RegionInlineKeyboardBuilder.as_markup()
-# ---------- Редактирование анкеты ----------
-FormEditKeyboardBuilder = InlineKeyboardBuilder()
-for text in EditButtons:
-    FormEditKeyboardBuilder.button(text=EditButtons[text], callback_data=f"edit_{text}")
-FormEditKeyboardBuilder.adjust(1, 2)
-FormEditKeyboard = FormEditKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
-# ---------- Просмотр анкеты ----------
-FormViewKeyboardBuilder = InlineKeyboardBuilder()
-for text in ViewButtons:
-    FormViewKeyboardBuilder.button(text=ViewButtons[text], callback_data=f"view_{text}")
-FormViewKeyboardBuilder.adjust(3)
-FormViewKeyboard = FormViewKeyboardBuilder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 
-# ---------- Выбор города ----------
+FormEditKeyboardBuilder = InlineKeyboardBuilder()
+for key, label in EditButtons.items():
+    FormEditKeyboardBuilder.button(text=label, callback_data=f"edit_{key}")
+FormEditKeyboardBuilder.adjust(1, 2)
+FormEditKeyboard = FormEditKeyboardBuilder.as_markup()
+
+FormViewKeyboardBuilder = InlineKeyboardBuilder()
+for key, label in ViewButtons.items():
+    FormViewKeyboardBuilder.button(text=label, callback_data=f"view_{key}")
+FormViewKeyboardBuilder.adjust(3)
+FormViewKeyboard = FormViewKeyboardBuilder.as_markup()
+
 Cities = {}
 for region in region_keys:
     builder = InlineKeyboardBuilder()
     for city in Regions[region]:
         builder.button(text=city, callback_data=f"city_{city}")
     builder.adjust(1)
-    Cities[region] = builder.as_markup()   
-    
-# ---------- Валидация вводимых значений ----------
-# Границы длины для текстовых полей анкеты: (мин_символов, макс_символов)
+    Cities[region] = builder.as_markup()
+
+# ---------- Валидация ----------
 FieldLimits = {
     "name": (1, 50),
     "univer": (1, 100),
@@ -274,17 +240,9 @@ FieldLimits = {
 AGE_MIN, AGE_MAX = 16, 100
 
 def validate_field(action: str, raw_text):
-    """
-    Проверяет введённое значение для конкретного шага анкеты.
-    Возвращает (ok, error_message, value):
-      ok=True  -> value уже приведено к нужному типу (int для возраста, str для остального)
-      ok=False -> value всегда None, error_message объясняет, что не так
-    """
     if raw_text is None:
         return False, "Пожалуйста, отправь текстовое сообщение (не фото, не стикер и т.п.).", None
-
     text = raw_text.strip()
-
     if action == "age":
         try:
             age = int(text)
@@ -293,46 +251,44 @@ def validate_field(action: str, raw_text):
         if age < AGE_MIN or age > AGE_MAX:
             return False, f"Укажи реальный возраст (от {AGE_MIN} до {AGE_MAX} лет).", None
         return True, None, age
-
     if action in FieldLimits:
         min_len, max_len = FieldLimits[action]
         if len(text) < min_len:
             return False, "Поле не может быть пустым.", None
         if len(text) > max_len:
             return False, f"Слишком длинно — не больше {max_len} символов (сейчас {len(text)}).", None
+        if action in ("name", "univer"):
+            if '\n' in text or '\r' in text or '\t' in text:
+                return False, "Использование переноса строки и табуляции запрещено. Введите текст в одну строку.", None
         return True, None, text
-
     return True, None, text
 
-# ---------- Функция для БД ----------
-#--------- Добавляем нового пользователя ----------
+# ---------- Функции БД ----------
 def new_user_sync(user_id: int):
-    response = supabase.table("users").upsert(
-        {"user_id": user_id}, on_conflict="user_id"
-    ).execute()
+    supabase.table("users").upsert({"user_id": user_id}, on_conflict="user_id").execute()
 
-async def set_string_field(user_id: int, field: str, value: str, table: str = "users", additional_field: str=None, additional_value: str=None):
+async def set_string_field(user_id: int, field: str, value: str, table: str = "users", additional_field: str=None, additional_value=None):
     def _update():
-        if additional_field is not None and additional_value is not None:
-            return supabase.table(table).update({field: value}).eq("user_id", user_id).eq(additional_field, additional_value).execute()
-        return supabase.table(table).update({field: value}).eq("user_id", user_id).execute()
+        q = supabase.table(table).update({field: value}).eq("user_id", user_id)
+        if additional_field and additional_value is not None:
+            q = q.eq(additional_field, additional_value)
+        return q.execute()
     await asyncio.to_thread(_update)
 
-async def set_int_field(user_id: int, field: str, value: int, table: str = "users", additional_field: str=None, additional_value: int=None):
+async def set_int_field(user_id: int, field: str, value: int, table: str = "users", additional_field: str=None, additional_value=None):
     def _update():
-        if additional_field is not None and additional_value is not None:
-            return supabase.table(table).update({field: value}).eq("user_id", user_id).eq(additional_field, additional_value).execute()
-        return supabase.table(table).update({field: value}).eq("user_id", user_id).execute()
+        q = supabase.table(table).update({field: value}).eq("user_id", user_id)
+        if additional_field and additional_value is not None:
+            q = q.eq(additional_field, additional_value)
+        return q.execute()
     await asyncio.to_thread(_update)
 
-
-# ---------- Получаем поле из БД ----------
 async def get_field(user_id: int, field: str, table: str = "users", additional_field: str = None, additional_value=None):
     def _select():
-        query = supabase.table(table).select(field).eq("user_id", user_id)
-        if additional_field is not None and additional_value is not None:
-            query = query.eq(additional_field, additional_value)
-        return query.execute()
+        q = supabase.table(table).select(field).eq("user_id", user_id)
+        if additional_field and additional_value is not None:
+            q = q.eq(additional_field, additional_value)
+        return q.execute()
     try:
         response = await asyncio.to_thread(_select)
         if response.data:
@@ -342,20 +298,17 @@ async def get_field(user_id: int, field: str, table: str = "users", additional_f
         logger.error("get_field(%s, %s) failed: %s", user_id, field, e)
         return None
 
-# ---------- Получаем пользователя ----------
 async def get_user_sync(user_id: int):
     def _update():
         response = supabase.table("users").select("*").eq("user_id", user_id).execute()
         if response.data:
-            return response.data[0] 
+            return response.data[0]
         return None
     return await asyncio.to_thread(_update)
 
-# ---------- Удаляем пользователя ----------
 def delete_user_sync(user_id: int):
-    response = supabase.table("users").delete().eq("user_id", user_id).execute()
+    supabase.table("users").delete().eq("user_id", user_id).execute()
 
-# ---------- Добавляем просмотр ----------
 async def add_view(user_id: int, viewed_user_id: int, state: str = "unseen"):
     def _update():
         return supabase.table("views").upsert(
@@ -365,67 +318,96 @@ async def add_view(user_id: int, viewed_user_id: int, state: str = "unseen"):
         ).execute()
     await asyncio.to_thread(_update)
 
-# ---------- Получаем анкету ----------
+async def increment_views_count(user_id: int):
+    def _sync():
+        resp = supabase.table("users").select("views_count").eq("user_id", user_id).execute()
+        if resp.data:
+            current = resp.data[0].get("views_count") or 0
+            new_count = current + 1
+            supabase.table("users").update({"views_count": new_count}).eq("user_id", user_id).execute()
+    await asyncio.to_thread(_sync)
+
 async def get_unseen_form(user_id: int, city: str):
     def _sync():
-        response = supabase.rpc("get_unseen_users", {"p_user_id": user_id, "p_city": city, "p_limit": 1}).execute()
-        if response.data:
-            return response.data[0]
+        response = supabase.rpc("get_unseen_users", {"p_user_id": user_id, "p_city": city}).execute()
+        return response.data
+    candidates = await asyncio.to_thread(_sync)
+    if not candidates:
         return None
-    form = await asyncio.to_thread(_sync)
-    if form:
-        await add_view(user_id, form["user_id"])
-    return form
 
-# ---------- Выводим и получаем вопрос в анкете ----------
+    now = time.time()
+    weights = []
+    for u in candidates:
+        last_active = u.get("last_active")
+        if last_active:
+            try:
+                if isinstance(last_active, str):
+                    dt = datetime.fromisoformat(last_active.replace('Z', '+00:00'))
+                    last_ts = dt.timestamp()
+                else:
+                    last_ts = last_active.timestamp()
+            except Exception:
+                last_ts = 0
+        else:
+            last_ts = 0
+        views = u.get("views_count") or 0
+        days_since_active = (now - last_ts) / 86400
+        weight = (days_since_active + 1) / (views + 1)
+        weights.append(weight)
+
+    selected = random.choices(candidates, weights=weights, k=1)[0]
+    await add_view(user_id, selected["user_id"])
+    await increment_views_count(selected["user_id"])
+    await set_string_field(user_id, "last_active", datetime.now(timezone.utc).isoformat())
+    return selected
+
+# ---------- Основные функции бота ----------
 async def form_question(message: types.Message):
     text = message.text
     user_id = message.from_user.id
     action = await get_field(user_id, "action")
-
     nextaction = NextAction.get(action)
     if nextaction is None:
         await message.answer("Что-то пошло не так. Отправь /form, чтобы начать заново.")
         return
-
     ok, error, value = validate_field(action, text)
     if not ok:
         await message.answer(f"⚠️ {error}")
         return
-
-    reply = None
     if action == "age":
         await set_int_field(user_id, action, value)
     else:
         await set_string_field(user_id, action, value)
+    reply = None
     if nextaction == "region":
         reply = RegionInlineKeyboard
-    if nextaction == "city":
-        reply = Cities[await get_field(user_id, "region")]
-    if await get_field(user_id, "form") != "true": #Если проходим анкету впервые выводим приветливые сообщения
+    elif nextaction == "city":
+        reply = Cities.get(await get_field(user_id, "region"))
+    if await get_field(user_id, "form") != "true":
         await message.answer(Phrases[nextaction+"Message2"], parse_mode="HTML")
     await message.answer(Phrases[nextaction+"Message1"], reply_markup=reply, parse_mode="HTML")
     await set_string_field(user_id, "action", nextaction)
     if nextaction == "confirm":
-        await message.answer(await print_profile(user_id=user_id), reply_markup=FormConfirmKeyboard, parse_mode="HTML")
+        profile_text = await print_profile(user_id=user_id)
+        if profile_text:
+            await message.answer(profile_text, reply_markup=FormConfirmKeyboard, parse_mode="HTML")
 
-# ---------- Редактируем анкету ----------
 async def form_edit(message: types.Message, action: str):
     user_id = message.from_user.id
     text = message.text
-
     ok, error, value = validate_field(action, text)
     if not ok:
         await message.answer(f"⚠️ {error}")
         return
-
     if action == "age":
         await set_int_field(user_id, action, value)
     else:
         await set_string_field(user_id, action, value)
-    await message.answer(await print_profile(user_id=user_id), reply_markup=FormEditKeyboard, parse_mode="HTML")
+    profile_text = await print_profile(user_id=user_id)
+    if profile_text:
+        await message.answer(profile_text, reply_markup=FormEditKeyboard, parse_mode="HTML")
+    await set_string_field(user_id, "action", "None")
 
-# ----------- Выводим профиль -----------
 async def print_profile(user_id=None, data=None):
     if data is None:
         if user_id is None:
@@ -439,76 +421,60 @@ async def print_profile(user_id=None, data=None):
         requirements = html.escape(str(data.get("requirements") or ""))
         yearword = ""
         if age is None:
-            age = ""
-        elif age < 5:
-            yearword = "года"
-        elif age < 21:
-            yearword = "лет"
-        elif age % 10 == 1 and age % 100 != 11:
-            yearword = "год"
-        elif age % 10 in [2, 3, 4] and age % 100 not in [12, 13, 14]:
-            yearword = "года"
+            age_display = ""
         else:
-            yearword = "лет"
+            age_display = age
+            if age < 5:
+                yearword = "года"
+            elif age < 21:
+                yearword = "лет"
+            elif age % 10 == 1 and age % 100 != 11:
+                yearword = "год"
+            elif age % 10 in [2,3,4] and age % 100 not in [12,13,14]:
+                yearword = "года"
+            else:
+                yearword = "лет"
         return (
-            f"<b>{name}</b>, {age} {yearword} | {univer}\n\n"
-            f"<b>О себе: </b>\n"
-            f"<i>{about}</i>\n\n"
-            f"<b>Пожелания к соседу: </b>\n"
-            f"<i>{requirements}</i>\n\n"
+            f"<b>{name}</b>, {age_display} {yearword} | {univer}\n\n"
+            f"<b>О себе: </b>\n<i>{about}</i>\n\n"
+            f"<b>Пожелания к соседу: </b>\n<i>{requirements}</i>\n\n"
         )
     return None
 
-
-# ----------- Возращаемся в меню -----------
 async def print_menu(message: types.Message):
+    await set_string_field(message.from_user.id, "action", "None")
     await message.answer(Phrases["Menu"], reply_markup=MainMenuKeyboard, parse_mode="HTML")
 
-# ----------- Старт анкеты -----------
 async def start_form(message: types.Message, user_id: int):
     if await get_field(user_id, "form") != "true":
-        # Первое заполнение анкеты — сначала правила и подтверждение.
         await message.answer(Phrases["RulesMessage"], reply_markup=RulesKeyboard, parse_mode="HTML")
         await set_string_field(user_id, "action", "rules")
     else:
-        # Анкета уже когда-то была заполнена (это Restart/редактирование с нуля) — правила не повторяем.
         await message.answer(Phrases['nameMessage1'], parse_mode="HTML")
         await set_string_field(user_id, "action", "name")
 
-# ----------- Меню команд -----------
 async def set_commands(bot: Bot):
-    commands = []
-    for command in CommandMenu:
-        commands.append(BotCommand(command=command, description=CommandMenu[command]))
+    commands = [BotCommand(command=cmd, description=desc) for cmd, desc in CommandMenu.items()]
     await bot.set_my_commands(commands)
-
-# ---------- Бот и диспетчер ----------
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
-
-@dp.error()
-async def error_handler(event: ErrorEvent):
-    logger.error("Unhandled exception in handler: %s", event.exception, exc_info=event.exception)
 
 # ---------- Команды ----------
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
     username = message.from_user.username
     await asyncio.to_thread(new_user_sync, user_id)
-    await set_string_field(message.from_user.id, "username", message.from_user.username)
-    await add_view(user_id, user_id, state="seen") 
+    await set_string_field(user_id, "username", username)
+    await set_string_field(user_id, "action", "None")
+    await add_view(user_id, user_id, state="seen")
     await message.answer(Phrases['StartMessage'], parse_mode="HTML")
 
 async def cmd_form(message: types.Message, user_id=None):
     await set_string_field(message.from_user.id, "username", message.from_user.username)
-    if user_id is not None:
-        user_id = int(user_id)
-        await message.answer(f"Город поиска: {await get_field(user_id, 'city')}({await get_field(user_id, 'region')})")
-    else:
+    if user_id is None:
         user_id = message.from_user.id
-    text = await print_profile(user_id=user_id)
-    if text is not None:
-        await message.answer(text, parse_mode="HTML", reply_markup=FormEditKeyboard)
+    await set_string_field(user_id, "action", "None")
+    profile_text = await print_profile(user_id=user_id)
+    if profile_text:
+        await message.answer(profile_text, reply_markup=FormEditKeyboard, parse_mode="HTML")
     else:
         await message.answer("Профиль не существует")
 
@@ -516,17 +482,10 @@ async def cmd_menu(message: types.Message):
     await set_string_field(message.from_user.id, "username", message.from_user.username)
     await print_menu(message)
 
-async def cmd_test(message: types.Message):
-    TestIKB = InlineKeyboardBuilder()
-    TestIKB.button(text="testText", callback_data="testCD")
-    TestIKB.adjust(1)
-    TestIK = TestIKB.as_markup()
-    await message.answer("TestAnswer", reply_markup=TestIK)
-
 async def cmd_find(message: types.Message, user_id=None):
-    await set_string_field(message.from_user.id, "username", message.from_user.username)
     if user_id is None:
         user_id = message.from_user.id
+    await set_string_field(user_id, "username", message.from_user.username)
     city = await get_field(user_id, "city")
     if city is None:
         await message.answer("Вы не указали город поиска. Пожалуйста, заполните анкету.")
@@ -536,7 +495,7 @@ async def cmd_find(message: types.Message, user_id=None):
         await message.answer("Нет доступных анкет для просмотра в вашем городе.")
         return
     profile_text = await print_profile(data=form)
-    if profile_text is not None:
+    if profile_text:
         await message.answer(profile_text, parse_mode="HTML", reply_markup=FormViewKeyboard)
     else:
         await message.answer("Ошибка при получении профиля.")
@@ -549,37 +508,150 @@ async def cmd_likes(message: types.Message, user_id=None):
     if user_id is None:
         user_id = message.from_user.id
     def _sync():
-        response = supabase.table("views").select("*").eq("viewed_user_id", user_id).eq("state", "like_unseen").execute()
-        return response.data
+        return supabase.table("views").select("*").eq("viewed_user_id", user_id).eq("state", "like_unseen").execute().data
     likes = await asyncio.to_thread(_sync)
     if not likes:
         await message.answer("У вас нет новых лайков.")
         return
-    liked_user_id = likes[0].get("user_id")
+    liked_user_id = likes[0]["user_id"]
     form = await get_user_sync(liked_user_id)
     if form is None:
         await message.answer("Анкета этого пользователя больше недоступна.")
         return
     profile_text = await print_profile(data=form)
-    if profile_text is not None:
+    if profile_text:
         await message.answer(profile_text, parse_mode="HTML", reply_markup=FormViewKeyboard)
     else:
         await message.answer("Ошибка при получении профиля.")
     await set_string_field(user_id, "action", f"likes_{liked_user_id}")
 
+# ---------- Обработка сообщений ----------
+async def text(message: types.Message):
+    text = message.text
+    user_id = message.from_user.id
+    action = await get_field(user_id, "action")
 
-def clear_all_data_sync():
-    supabase.table("views").delete().neq("user_id", -1).execute()
-    supabase.table("users").delete().neq("user_id", -1).execute()
+    # 1. Обработка root-кода (админ)
+    if text == ROOT_CODE and await get_field(user_id, "root") != "true":
+        await set_string_field(user_id, "root", "true")
+        await message.answer(Phrases["RootCode"], parse_mode="HTML")
+        return
 
+    # 2. Обработка кнопок главного меню и возврата (даже если action не None)
+    if text == MainButtons["Profile"]:
+        await set_string_field(user_id, "action", "None")
+        await cmd_form(message, user_id=user_id)
+        return
+    if text == MainButtons["Find"]:
+        await set_string_field(user_id, "action", "None")
+        await cmd_find(message)
+        return
+    if text == MainButtons["Likes"]:
+        await set_string_field(user_id, "action", "None")
+        await cmd_likes(message)
+        return
+    if text == MainButtons["FAQ"]:
+        await cmd_faq(message)
+        return
+    if text == ReturnButton["Return"]:
+        await print_menu(message)
+        return
 
-def recreate_database_sync():
-    # Вызывает Postgres-функцию recreate_database(), которую нужно один раз
-    # создать в Supabase SQL Editor (см. setup_recreate_function.sql) —
-    # обычный REST-клиент supabase-py не умеет выполнять DDL напрямую.
-    return supabase.rpc("recreate_database").execute()
+    # 3. Обработка состояний (action)
+    if action == "rules":
+        if text == RulesButtons["Accept"]:
+            await message.answer(Phrases['nameMessage1'], parse_mode="HTML")
+            await message.answer(Phrases['nameMessage2'], parse_mode="HTML")
+            await set_string_field(user_id, "action", "name")
+        else:
+            await message.answer("Пожалуйста, подтверди согласие с правилами, чтобы продолжить.", reply_markup=RulesKeyboard)
+        return
 
+    if action in Actions:
+        if action == "confirm":
+            if text == FormButtons["Restart"]:
+                await set_string_field(user_id, "action", "None")
+                await start_form(message, user_id)
+            elif text == FormButtons["Confirm"]:
+                await set_string_field(user_id, "form", "true")
+                await set_string_field(user_id, "action", "None")
+                await message.answer(Phrases["FormSaved"], parse_mode="HTML")
+                await print_menu(message)
+            else:
+                await message.answer("Пожалуйста, используй кнопки ниже.", reply_markup=FormConfirmKeyboard)
+            return
+        await form_question(message)
+        return
 
+    if action in ActionEdit:
+        await form_edit(message, action[:-4])
+        return
+
+    # Если ничего не подошло
+    await message.answer("Я не понимаю эту команду. Используй кнопки меню или /help.")
+
+# ---------- Админ-команды ----------
+async def cmd(message: types.Message):
+    text = message.text
+    user_id = message.from_user.id
+    if await get_field(user_id, "root") != "true":
+        return
+
+    if text.startswith("cmd_deleteform"):
+        parts = text.split()
+        if len(parts) == 2:
+            try:
+                target_id = int(parts[1])
+            except ValueError:
+                await message.answer("Неверный ID пользователя")
+                return
+        else:
+            await message.answer("Формат: cmd_deleteform <user_id>")
+            return
+        await asyncio.to_thread(delete_user_sync, target_id)
+        await message.answer(f"Анкета пользователя {target_id} удалена.")
+
+    elif text == "cmd_cleardata":
+        await set_string_field(user_id, "action", "confirm_cleardata")
+        await message.answer(
+            "⚠️ Это удалит ВСЕ данные из таблиц users и views без возможности восстановления.\n"
+            "Для подтверждения отправьте: cmd_cleardata_confirm"
+        )
+
+    elif text == "cmd_cleardata_confirm":
+        if await get_field(user_id, "action") != "confirm_cleardata":
+            await message.answer("Сначала отправьте cmd_cleardata")
+            return
+        await asyncio.to_thread(clear_all_data_sync)
+        await message.answer("✅ Все данные удалены. Отправьте /start и код root заново, чтобы продолжить как администратор.")
+
+    elif text == "cmd_recreatedb":
+        await set_string_field(user_id, "action", "confirm_recreatedb")
+        await message.answer(
+            "⚠️ Это ПОЛНОСТЬЮ удалит и заново создаст таблицы users, views и функцию get_unseen_users.\n"
+            "Требуется, чтобы в Supabase уже была создана функция recreate_database.\n"
+            "Для подтверждения отправьте: cmd_recreatedb_confirm"
+        )
+
+    elif text == "cmd_recreatedb_confirm":
+        if await get_field(user_id, "action") != "confirm_recreatedb":
+            await message.answer("Сначала отправьте cmd_recreatedb")
+            return
+        try:
+            await asyncio.to_thread(recreate_database_sync)
+            await message.answer("✅ База данных пересоздана.")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка при пересоздании БД: {e}")
+
+    elif text == "cmd_selftest":
+        await message.answer("⏳ Запускаю диагностику...")
+        report = await run_diagnostics()
+        await message.answer(report)
+
+    else:
+        await message.answer("Неизвестная админ-команда.")
+
+# ---------- Диагностика ----------
 async def run_diagnostics() -> str:
     results = []
 
@@ -603,7 +675,7 @@ async def run_diagnostics() -> str:
 
     try:
         await asyncio.to_thread(lambda: supabase.rpc(
-            "get_unseen_users", {"p_user_id": DIAG_TEST_ID, "p_city": "__diag__", "p_limit": 1}
+            "get_unseen_users", {"p_user_id": DIAG_TEST_ID, "p_city": "__diag__"}
         ).execute())
         results.append("✅ Функция get_unseen_users отвечает")
     except Exception as e:
@@ -640,7 +712,6 @@ async def run_diagnostics() -> str:
     try:
         await set_string_field(DIAG_TEST_ID, "city", "Москва")
         await set_string_field(DIAG_TEST_ID, "form", "true")
-        
         start = time.time()
         await asyncio.to_thread(lambda: supabase.table("users").select("*").limit(10).execute())
         elapsed = time.time() - start
@@ -651,8 +722,7 @@ async def run_diagnostics() -> str:
     try:
         start = time.time()
         await asyncio.to_thread(lambda: supabase.rpc(
-            "get_unseen_users",
-            {"p_user_id": DIAG_TEST_ID, "p_city": "Москва", "p_limit": 1}
+            "get_unseen_users", {"p_user_id": DIAG_TEST_ID, "p_city": "Москва"}
         ).execute())
         elapsed = time.time() - start
         results.append(f"⏱️ Вызов get_unseen_users (Москва): {elapsed:.3f} сек")
@@ -667,18 +737,17 @@ async def run_diagnostics() -> str:
     except Exception as e:
         results.append(f"❌ SELECT * FROM views LIMIT 10: {e}")
 
-    # ---------- Очистка ----------
     try:
         await asyncio.to_thread(lambda: supabase.table("views").delete().eq("user_id", DIAG_TEST_ID).execute())
         await asyncio.to_thread(delete_user_sync, DIAG_TEST_ID)
         results.append("✅ Очистка тестовых данных")
     except Exception as e:
         results.append(f"❌ Очистка тестовых данных: {e}")
+
     try:
         def _many_queries():
-            for i in range(100):
+            for _ in range(100):
                 supabase.table("users").select("user_id").limit(1).execute()
-
         start = time.time()
         await asyncio.to_thread(_many_queries)
         elapsed = time.time() - start
@@ -688,174 +757,62 @@ async def run_diagnostics() -> str:
 
     try:
         def _many_rpc():
-            for i in range(100):
-                supabase.rpc("get_unseen_users", {"p_user_id": DIAG_TEST_ID, "p_city": "Москва", "p_limit": 1}).execute()
-
+            for _ in range(100):
+                supabase.rpc("get_unseen_users", {"p_user_id": DIAG_TEST_ID, "p_city": "Москва"}).execute()
         start = time.time()
         await asyncio.to_thread(_many_rpc)
         elapsed = time.time() - start
         results.append(f"⏱️ 100 вызовов RPC get_unseen_users: {elapsed:.3f} сек (в среднем {elapsed/100:.3f} сек/вызов)")
     except Exception as e:
         results.append(f"❌ 100 вызовов RPC: {e}")
-    return "🔧 Диагностика Livether\n\n" + "\n".join(results)
 
+    return f"🔧 Диагностика {BOT_NAME}\n\n" + "\n".join(results)
 
-# ----------- Обработка команд -------------
-async def command(message: types.Message):
-    text = message.text
-    if text == "/start":
-        await cmd_start(message)
-    elif text == "/form":
-        await start_form(message, message.from_user.id)
-    elif text == "/profile":
-        await cmd_form(message)
-    elif text == "/menu":
-        await cmd_menu(message)
-    elif text == "/test":
-        await cmd_test(message)
-    elif text == "/find":
-        await cmd_find(message)
-    elif text == "/faq":
-        await cmd_faq(message)
-    elif text == "/likes":
-        await cmd_likes(message)
-# ---------- Обработка сообщений ----------
-async def text(message: types.Message):
-    text = message.text
-    user_id = message.from_user.id
-    action = await get_field(user_id, "action")
-    if text == ROOT_CODE and await get_field(user_id, "root") != "true":
-        await set_string_field(user_id, "root", "true")
-        await message.answer(Phrases["RootCode"], parse_mode="HTML")
-        return
-    if action == "rules":
-        if text == RulesButtons["Accept"]:
-            await message.answer(Phrases['nameMessage1'], parse_mode="HTML")
-            await message.answer(Phrases['nameMessage2'], parse_mode="HTML")
-            await set_string_field(user_id, "action", "name")
-        else:
-            await message.answer("Пожалуйста, подтверди согласие с правилами, чтобы продолжить.", reply_markup=RulesKeyboard)
-        return
-    if action is None or action == "None":
-        await message.answer("Что-то пошло не так. Отправь /form, чтобы начать заново.")
-        return
-    if action in Actions:
-        if action == "confirm":
-            if text == FormButtons["Restart"]:
-                await set_string_field(user_id, "action", "None")
-                await start_form(message, user_id)
-            elif text == FormButtons["Confirm"]:
-                await set_string_field(user_id, "form", "true")
-                await set_string_field(user_id, "action", "None")
-                await message.answer(Phrases["FormSaved"], parse_mode="HTML")
-                await print_menu(message)
-            else:
-                await message.answer("Пожалуйста, используй кнопки ниже.", reply_markup=FormConfirmKeyboard)
-            return
-        await form_question(message)
-        return
-    if action in ActionEdit:
-        await form_edit(message, action[:-4])
-        return
-    if text == ReturnButton["Return"]:
-        await set_string_field(user_id, "action", "None")
-        await print_menu(message)
-    if text == MainButtons["Profile"]:
-        await cmd_form(message, user_id=user_id)
-    if text == MainButtons["Find"]:
-        await cmd_find(message)
-    if text == MainButtons["Likes"]:
-        await cmd_likes(message)
-    if text == MainButtons["FAQ"]:
-        await cmd_faq(message)
+def clear_all_data_sync():
+    supabase.table("views").delete().neq("user_id", -1).execute()
+    supabase.table("users").delete().neq("user_id", -1).execute()
 
-# ---------- Консольные команды ----------
-async def cmd(message: types.Message):
-    text = message.text
-    user_id = message.from_user.id
-    if await get_field(user_id, "root") != "true":
-        return
-    if text.startswith("cmd_deleteform"):
-        if len(text) == 14:
-            target_id = message.from_user.id
-        elif len(text) == 25:
-            try:
-                target_id = int(text[15:])
-            except ValueError:
-                await message.answer("Неверный формат команды")
-                return
-        else:
-            await message.answer("Неверный формат команды")
-            return
-        await asyncio.to_thread(delete_user_sync, target_id)
-        await message.answer("Анкета удалена.")
-    elif text == "cmd_cleardata":
-        await set_string_field(user_id, "action", "confirm_cleardata")
-        await message.answer(
-            "⚠️ Это удалит ВСЕ данные из таблиц users и views без возможности восстановления.\n"
-            "Для подтверждения отправьте: cmd_cleardata_confirm"
-        )
-    elif text == "cmd_cleardata_confirm":
-        if await get_field(user_id, "action") != "confirm_cleardata":
-            await message.answer("Сначала отправьте cmd_cleardata")
-            return
-        await asyncio.to_thread(clear_all_data_sync)
-        await message.answer("✅ Все данные удалены. Отправьте /start и код root заново, чтобы продолжить как администратор.")
-    elif text == "cmd_recreatedb":
-        await set_string_field(user_id, "action", "confirm_recreatedb")
-        await message.answer(
-            "⚠️ Это ПОЛНОСТЬЮ удалит и заново создаст таблицы users, views и функцию get_unseen_users.\n"
-            "Требуется, чтобы в Supabase уже была создана функция recreate_database "
-            "(см. setup_recreate_function.sql, выполняется один раз через SQL Editor).\n"
-            "Для подтверждения отправьте: cmd_recreatedb_confirm"
-        )
-    elif text == "cmd_recreatedb_confirm":
-        if await get_field(user_id, "action") != "confirm_recreatedb":
-            await message.answer("Сначала отправьте cmd_recreatedb")
-            return
-        try:
-            await asyncio.to_thread(recreate_database_sync)
-            await message.answer("✅ База данных пересоздана. Отправьте /start и код root заново, чтобы продолжить как администратор.")
-        except Exception as e:
-            await message.answer(f"❌ Ошибка при пересоздании БД: {e}")
-    elif text == "cmd_selftest":
-        await message.answer("⏳ Запускаю диагностику...")
-        report = await run_diagnostics()
-        await message.answer(report)
+def recreate_database_sync():
+    return supabase.rpc("recreate_database").execute()
 
-# ---------- Принимаем сообщения ----------
+# ---------- Обработчики диспетчера ----------
 @dp.message()
 async def message(message: types.Message):
     mtext = message.text
-    user_id = message.from_user.id
     username = message.from_user.username
-    if not(username):
+    if not username:
         await message.answer("Чтобы пользоваться ботом установите имя пользователя в настройках Telegram")
         return
     if mtext and mtext[0] == "/":
-        await command(message)
-    elif mtext and mtext[:4] == "cmd_":
+        if mtext == "/start": await cmd_start(message)
+        elif mtext == "/form": await start_form(message, message.from_user.id)
+        elif mtext == "/profile": await cmd_form(message)
+        elif mtext == "/menu": await cmd_menu(message)
+        elif mtext == "/find": await cmd_find(message)
+        elif mtext == "/faq": await cmd_faq(message)
+        elif mtext == "/likes": await cmd_likes(message)
+        else:
+            await message.answer("Неизвестная команда. Используй /help.")
+        return
+    if mtext and mtext[:4] == "cmd_":
         await cmd(message)
-    else:
-        await text(message)
+        return
+    await text(message)
 
-# ---------- Принимаем сигналы от Inline клавиатуры ----------
 @dp.callback_query()
 async def callback_query(callback: CallbackQuery):
     data = callback.data
     user_id = callback.from_user.id
     await set_string_field(user_id, "username", callback.from_user.username)
     form = await get_field(user_id, "form")
+
     if data.startswith("reg_"):
         try:
             region_idx = int(data.split("_")[1])
-        except ValueError:
+            region_name = region_keys[region_idx]
+        except (IndexError, ValueError):
             await callback.answer("Некорректный выбор региона.")
             return
-        if not (0 <= region_idx < len(region_keys)):
-            await callback.answer("Некорректный выбор региона.")
-            return
-        region_name = region_keys[region_idx]
         await set_string_field(user_id, "region", region_name)
         if await get_field(user_id, "action") != "regionEdit":
             await set_string_field(user_id, "action", "city")
@@ -865,8 +822,9 @@ async def callback_query(callback: CallbackQuery):
         if form != "true":
             await callback.message.answer(Phrases["cityMessage2"], parse_mode="HTML")
         await callback.message.answer(Phrases["cityMessage1"], reply_markup=Cities[region_name], parse_mode="HTML")
-    elif data.startswith("city_"):  
-        city_name = data[5:]  
+
+    elif data.startswith("city_"):
+        city_name = data[5:]
         await set_string_field(user_id, "city", city_name)
         if await get_field(user_id, "action") == "cityEdit":
             await callback.answer()
@@ -875,7 +833,9 @@ async def callback_query(callback: CallbackQuery):
         await set_string_field(user_id, "action", "confirm")
         await callback.answer()
         profile_text = await print_profile(user_id=user_id)
-        await callback.message.answer(Phrases["confirmMessage"] + "\n" + profile_text, reply_markup=FormConfirmKeyboard, parse_mode="HTML")
+        if profile_text:
+            await callback.message.answer(Phrases["confirmMessage"] + "\n" + profile_text, reply_markup=FormConfirmKeyboard, parse_mode="HTML")
+
     elif data.startswith("edit_"):
         action = data[5:]
         if action not in EditButtons:
@@ -888,17 +848,19 @@ async def callback_query(callback: CallbackQuery):
         await set_string_field(user_id, "action", action+"Edit")
         await callback.message.answer(Phrases[action+"Message1"], reply_markup=reply, parse_mode="HTML")
         await callback.answer()
+
     elif data.startswith("view_"):
         reaction = data[5:]
         action_value = await get_field(user_id, "action")
         if not action_value:
             await callback.answer("Действие устарело, начните заново.")
             return
+
         if action_value.startswith("likes"):
             try:
                 liked_user_id = int(action_value.split("_")[1])
             except (IndexError, ValueError):
-                await callback.answer("Действие устарело, начните заново.")
+                await callback.answer("Действие устарело.")
                 await set_string_field(user_id, "action", "None")
                 return
             if reaction == "like":
@@ -911,24 +873,21 @@ async def callback_query(callback: CallbackQuery):
             elif reaction == "report":
                 current_reports = await get_field(liked_user_id, "reports") or 0
                 await set_int_field(liked_user_id, "reports", current_reports + 1)
-            # Сначала фиксируем "seen" для обеих сторон, и только потом (если это
-            # был dislike) переходим к следующему лайку — иначе cmd_likes покажет
-            # ту же самую, ещё не отмеченную как просмотренную, анкету повторно.
             await set_string_field(liked_user_id, "state", "seen", table="views", additional_field="viewed_user_id", additional_value=user_id)
             await set_string_field(user_id, "state", "seen", table="views", additional_field="viewed_user_id", additional_value=liked_user_id)
             await callback.answer()
             if reaction == "dislike":
                 await cmd_likes(callback.message, user_id=user_id)
             return
+
         elif action_value.startswith("viewing"):
             try:
                 viewed_id = int(action_value.split("_")[1])
             except (IndexError, ValueError):
-                await callback.answer("Действие устарело, начните заново.")
+                await callback.answer("Действие устарело.")
                 await set_string_field(user_id, "action", "None")
                 return
             if reaction == "like":
-                # Проверяем взаимность: лайкал ли viewed_id нас раньше.
                 mutual_state = await get_field(viewed_id, "state", table="views", additional_field="viewed_user_id", additional_value=user_id)
                 if mutual_state == "like_unseen":
                     liker_username = await get_field(user_id, "username")
@@ -957,20 +916,18 @@ async def callback_query(callback: CallbackQuery):
         await callback.answer()
         await bot.send_message(user_id, data)
 
-# ---------- Функция установки вебхука (будет вызвана при старте) ----------
+# ---------- Веб-сервер ----------
 async def on_startup(app: web.Application):
     await bot.delete_webhook(drop_pending_updates=True)
-    await bot.set_webhook(WEBHOOK_URL, allowed_updates=dp.resolve_used_update_types(), drop_pending_updates=True)
-    await set_commands(bot) 
-    
+    await bot.set_webhook(WEBHOOK_URL, allowed_updates=dp.resolve_used_update_types())
+    logger.info(f"Вебхук установлен на {WEBHOOK_URL}")
+    await set_commands(bot)
 
-# ---------- Создание aiohttp-приложения ----------
 def create_app():
     app = web.Application()
-    async def health(request):
-        return web.Response(text="OK", status=200)
-    app.router.add_get("/", health)
-    app.router.add_get("/health", health)
+    app.router.add_get("/", lambda request: web.Response(text="OK"))
+    app.router.add_get("/health", lambda request: web.Response(text="OK"))
+    from aiogram.webhook import aiohttp_server
     webhook_requests = aiohttp_server.SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
