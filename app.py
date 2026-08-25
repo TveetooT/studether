@@ -387,25 +387,38 @@ async def form_question(message: types.Message):
     user_id = message.from_user.id
     action = await get_field(user_id, "action")
     nextaction = NextAction.get(action)
+
     if nextaction is None:
         await message.answer("Что-то пошло не так. Отправь /form, чтобы начать заново.")
         return
+
+    # Валидация введённых данных
     ok, error, value = validate_field(action, text)
     if not ok:
         await message.answer(f"⚠️ {error}")
         return
+
+    # Сохранение значения
     if action == "age":
         await set_int_field(user_id, action, value)
     else:
         await set_string_field(user_id, action, value)
+
+    # ---- ИСПРАВЛЕНИЕ: отправка Message2 только если он не пуст ----
+    if await get_field(user_id, "form") != "true":
+        msg2 = Phrases.get(nextaction + "Message2")
+        if msg2 and msg2.strip():          # проверка на непустую строку
+            await message.answer(msg2, parse_mode="HTML")
+
     reply = None
     if nextaction == "region":
         reply = RegionInlineKeyboard
     elif nextaction == "city":
         reply = Cities.get(await get_field(user_id, "region"))
-    if await get_field(user_id, "form") != "true":
-        await message.answer(Phrases[nextaction+"Message2"], parse_mode="HTML")
-    await message.answer(Phrases[nextaction+"Message1"], reply_markup=reply, parse_mode="HTML")
+    msg1 = Phrases.get(nextaction + "Message1")
+    if not msg1:
+        msg1 = f"Шаг {nextaction} (в разработке)"
+    await message.answer(msg1, reply_markup=reply, parse_mode="HTML")
     await set_string_field(user_id, "action", nextaction)
     if nextaction == "confirm":
         profile_text = await print_profile(user_id=user_id)
