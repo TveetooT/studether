@@ -879,7 +879,19 @@ def create_app():
 
 # ---------- Точка входа ----------
 async def main():
-    await bot.delete_webhook(drop_pending_updates=True)
+    # Пытаемся удалить вебхук до 3 раз
+    for attempt in range(3):
+        try:
+            await bot.delete_webhook(drop_pending_updates=True)
+            logger.info("Вебхук удалён")
+            break
+        except Exception as e:
+            logger.warning(f"Попытка {attempt+1} удалить вебхук не удалась: {e}")
+            await asyncio.sleep(1)
+    else:
+        logger.error("Не удалось удалить вебхук после 3 попыток")
+    
+    await asyncio.sleep(2)  # пауза перед стартом
     await set_commands(bot)
 
     app = create_app()
