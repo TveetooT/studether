@@ -14,6 +14,7 @@ from aiogram.types import (
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 from supabase import create_client
+from collections import Counter
 
 # ---------- Импорт регионов ----------
 from regions import Regions
@@ -927,6 +928,7 @@ def create_app():
     app = web.Application()
     app.router.add_get("/", lambda request: web.Response(text="OK"))
     app.router.add_get("/health", lambda request: web.Response(text="OK"))
+    app.router.add_get("/stats", stats)
     from aiogram.webhook import aiohttp_server
     webhook_requests = aiohttp_server.SimpleRequestHandler(
         dispatcher=dp,
@@ -935,6 +937,145 @@ def create_app():
     webhook_requests.register(app, path="/webhook")
     app.on_startup.append(on_startup)
     return app
+
+async def stats(request):
+    """Эндпоинт для отображения статистики бота."""
+    def _get_stats():
+        # Общее количество пользователей
+        users_resp = supabase.table("users").select("user_id", count="exact").execute()
+        total_users = users_resp.count if hasattr(users_resp, 'count') else len(users_resp.data)
+
+        # Количество заполненных анкет (form = 'true')
+        filled_resp = supabase.table("users").select("user_id", count="exact").eq("form", "true").execute()
+        filled_forms = filled_resp.count if hasattr(filled_resp, 'count') else len(filled_resp.data)
+
+        # Общее количество просмотров (записей в views)
+        views_resp = supabase.table("views").select("user_id", count="exact").execute()
+        total_views = views_resp.count if hasattr(views_resp, 'count') else len(views_resp.data)
+
+        # Количество лайков (state = 'like_unseen')
+        likes_resp = supabase.table("views").select("user_id", count="exact").eq("state", "like_unseen").execute()
+        total_likes = likes_resp.count if hasattr(likes_resp, 'count') else len(likes_resp.data)
+
+        # Топ-5 городов по количеству заполненных анкет
+        cities_resp = supabase.table("users").select("city").eq("form", "true").execute()
+        city_counter = Counter(row["city"] for row in cities_resp.data if row.get("city"))
+        top_cities = city_counter.most_common(5)
+
+        return {
+            "total_users": total_users,
+            "filled_forms": filled_forms,
+            "total_views": total_views,
+            "total_likes": total_likes,
+            "top_cities": top_cities,
+        }
+
+    try:
+        stats_data = await asyncio.to_thread(_get_stats)
+    except Exception as e:
+        logger.error(f"Ошибка получения статистики: {e}")
+        return web.Response(text="Ошибка получения данных", status=500)
+
+    # Формируем HTML
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>📊 Статистика Livether</title>
+        <style>
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                max-width: 700px;
+                margin: 30px auto;
+                padding: 20px;
+                background: #f0f2f5;
+                color: #1a1a2e;
+            }}
+            h1 {{
+                text-align: center;
+                font-size: 28px;
+                color: #16213e;
+            }}
+            .card {{
+                background: white;
+                padding: 15px 25px;
+                margin: 15px 0;
+                border-radius: 12px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }}
+            .card .label {{
+                font-weight: 500;
+                color: #555;
+            }}
+            .card .value {{
+                font-size: 26px;
+                font-weight: bold;
+                color: #0f3460;
+            }}
+            .city-list {{
+                list-style: none;
+                padding: 0;
+                margin: 5px 0;
+            }}
+            .city-list li {{
+                display: flex;
+                justify-content: space-between;
+                padding: 6px 0;
+                border-bottom: 1px solid #eee;
+            }}
+            .footer {{
+                text-align: center;
+                color: #888;
+                font-size: 14px;
+                margin-top: 20px;
+            }}
+            .badge {{
+                background: #e94560;
+                color: white;
+                padding: 4px 10px;
+                border-radius: 20px;
+                font-size: 14px;
+            }}
+        </style>
+    </head>
+    <body>
+        <h1>📊 Статистика Livether</h1>
+
+        <div class="card">
+            <span class="label">👥 Всего пользователей</span>
+            <span class="value">{stats_data['total_users']}</span>
+        </div>
+        <div class="card">
+            <span class="label">✅ Заполненных анкет</span>
+            <span class="value">{stats_data['filled_forms']}</span>
+        </div>
+        <div class="card">
+            <span class="label">👁️ Всего просмотров</span>
+            <span class="value">{stats_data['total_views']}</span>
+        </div>
+        <div class="card">
+            <span class="label">❤️ Лайков</span>
+            <span class="value">{stats_data['total_likes']}</span>
+        </div>
+        <div class="card" style="flex-direction:column; align-items:stretch;">
+            <span class="label" style="margin-bottom:10px;">🏙️ Топ-5 городов</span>
+            <ul class="city-list">
+                {"".join(f"<li><span>{city}</span><span class='badge'>{count}</span></li>" for city, count in stats_data['top_cities'])}
+            </ul>
+        </div>
+
+        <div class="footer">
+            <p>🔄 Обновлено: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        </div>
+    </body>
+    </html>
+    """
+    return web.Response(text=html_content, content_type='text/html')
 
 # ---------- Точка входа ----------
 if __name__ == "__main__":
