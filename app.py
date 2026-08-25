@@ -727,9 +727,6 @@ async def text(message: types.Message):
         else:
             await message.answer("Пожалуйста, подтверди согласие с правилами, чтобы продолжить.", reply_markup=RulesKeyboard)
         return
-    if action is None or action == "None":
-        await message.answer("Что-то пошло не так. Отправь /form, чтобы начать заново.")
-        return
     if action in Actions:
         if action == "confirm":
             if text == FormButtons["Restart"]:
