@@ -59,7 +59,7 @@ DIAG_TEST_ID = -999999
 Actions = ["name", "age", "univer", "about", "requirements", "confirm"]
 ActionEdit = ["nameEdit", "ageEdit", "univerEdit", "aboutEdit", "requirementsEdit"]
 
-# ---------- Словарь фраз (ТОЛЬКО ОДНО СООБЩЕНИЕ НА ШАГ) ----------
+# ---------- Словарь фраз ----------
 Phrases = {
     "StartMessage": (
         "👋 Привет! Я бот <b>Livether</b> — твой помощник в поиске идеального соседа для совместной аренды! 🏠\n\n"
@@ -380,35 +380,29 @@ async def form_question(message: types.Message):
         await message.answer("Что-то пошло не так. Отправь /form, чтобы начать заново.")
         return
 
-    # Валидация
     ok, error, value = validate_field(action, text)
     if not ok:
         await message.answer(f"⚠️ {error}")
         return
 
-    # Сохранение значения
     if action == "age":
         await set_int_field(user_id, action, value)
     else:
         await set_string_field(user_id, action, value)
 
-    # Подготовка клавиатуры (для региона/города)
     reply = None
     if nextaction == "region":
         reply = RegionInlineKeyboard
     elif nextaction == "city":
         reply = Cities.get(await get_field(user_id, "region"))
 
-    # Отправляем ОДНО сообщение (без дублирующих Message2)
     msg = Phrases.get(nextaction + "Message")
     if not msg:
         msg = f"Шаг {nextaction} (в разработке)"
     await message.answer(msg, reply_markup=reply, parse_mode="HTML")
 
-    # Обновляем состояние
     await set_string_field(user_id, "action", nextaction)
 
-    # Если дошли до подтверждения – показываем анкету
     if nextaction == "confirm":
         profile_text = await print_profile(user_id=user_id)
         if profile_text:
@@ -484,13 +478,14 @@ async def cmd_start(message: types.Message):
     user_id = message.from_user.id
     username = message.from_user.username
     await asyncio.to_thread(new_user_sync, user_id)
-    await set_string_field(user_id, "username", username)
+    # Сохраняем username только здесь
+    if username:
+        await set_string_field(user_id, "username", username)
     await set_string_field(user_id, "action", "None")
     await add_view(user_id, user_id, state="seen")
     await message.answer(Phrases['StartMessage'], parse_mode="HTML")
 
 async def cmd_form(message: types.Message, user_id=None):
-    await set_string_field(message.from_user.id, "username", message.from_user.username)
     if user_id is None:
         user_id = message.from_user.id
     await set_string_field(user_id, "action", "None")
@@ -501,13 +496,11 @@ async def cmd_form(message: types.Message, user_id=None):
         await message.answer("Профиль не существует")
 
 async def cmd_menu(message: types.Message):
-    await set_string_field(message.from_user.id, "username", message.from_user.username)
     await print_menu(message)
 
 async def cmd_find(message: types.Message, user_id=None):
     if user_id is None:
         user_id = message.from_user.id
-    await set_string_field(user_id, "username", message.from_user.username)
     city = await get_field(user_id, "city")
     if city is None:
         await message.answer("Вы не указали город поиска. Пожалуйста, заполните анкету.")
@@ -676,7 +669,6 @@ async def cmd(message: types.Message):
 async def run_diagnostics() -> str:
     results = []
     try:
-        # Проверка подключения к БД
         resp = await asyncio.to_thread(lambda: supabase.table("users").select("count", count="exact").limit(1).execute())
         results.append("✅ БД доступна")
     except Exception as e:
@@ -725,7 +717,7 @@ async def message(message: types.Message):
 async def callback_query(callback: CallbackQuery):
     data = callback.data
     user_id = callback.from_user.id
-    await set_string_field(user_id, "username", callback.from_user.username)
+
     form = await get_field(user_id, "form")
 
     if data.startswith("reg_"):
@@ -741,7 +733,6 @@ async def callback_query(callback: CallbackQuery):
         else:
             await set_string_field(user_id, "action", "cityEdit")
         await callback.answer()
-        # Отправляем только одно сообщение с выбором города (без cityMessage2)
         await callback.message.answer(Phrases["cityMessage"], reply_markup=Cities[region_name], parse_mode="HTML")
 
     elif data.startswith("city_"):
@@ -767,7 +758,6 @@ async def callback_query(callback: CallbackQuery):
             reply = RegionInlineKeyboard
             action = "region"
         await set_string_field(user_id, "action", action+"Edit")
-        # Отправляем одно сообщение (без Message2)
         await callback.message.answer(Phrases[action+"Message"], reply_markup=reply, parse_mode="HTML")
         await callback.answer()
 
@@ -852,7 +842,6 @@ async def stats(request):
         since = now - timedelta(days=30)
 
     def _get_stats():
-        # Базовые запросы с учётом даты
         users_query = supabase.table("users").select("user_id", count="exact")
         forms_query = supabase.table("users").select("user_id", count="exact").eq("form", "true")
         views_query = supabase.table("views").select("user_id", count="exact")
@@ -888,7 +877,6 @@ async def stats(request):
         logger.error(f"Ошибка получения статистики: {e}")
         return web.Response(text="Ошибка получения данных", status=500)
 
-    # HTML страница с периодами
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -960,7 +948,6 @@ async def admin_login(request):
         else:
             return web.Response(text="Неверный код", status=403)
 
-    # GET – показываем форму
     html_content = """
     <!DOCTYPE html>
     <html><head><meta charset="utf-8"><title>Вход в админку</title>
