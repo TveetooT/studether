@@ -315,6 +315,11 @@ async def get_user_sync(user_id: int):
     return await asyncio.to_thread(_update)
 
 def delete_user_sync(user_id: int):
+    # Удаляем все записи, где user_id = удаляемый (он смотрел других)
+    supabase.table("views").delete().eq("user_id", user_id).execute()
+    # Удаляем все записи, где viewed_user_id = удаляемый (его смотрели другие)
+    supabase.table("views").delete().eq("viewed_user_id", user_id).execute()
+    # Удаляем самого пользователя
     supabase.table("users").delete().eq("user_id", user_id).execute()
 
 async def add_view(user_id: int, viewed_user_id: int, state: str = "unseen"):
@@ -1087,12 +1092,23 @@ async def admin_logout(request):
     resp.del_cookie(COOKIE_NAME)
     return resp
 
+async def webhook_refresher():
+    """Фоновый процесс, переустанавливающий вебхук каждые 10 минут."""
+    while True:
+        await asyncio.sleep(600)  # 10 минут
+        try:
+            await bot.set_webhook(WEBHOOK_URL, allowed_updates=dp.resolve_used_update_types())
+            logger.info("✅ Вебхук переустановлен")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при переустановке вебхука: {e}")
+
 # ---------- Веб-сервер ----------
 async def on_startup(app: web.Application):
     await bot.delete_webhook(drop_pending_updates=True)
     await bot.set_webhook(WEBHOOK_URL, allowed_updates=dp.resolve_used_update_types())
     logger.info(f"Вебхук установлен на {WEBHOOK_URL}")
     await set_commands(bot)
+    asyncio.create_task(webhook_refresher())
 
 def create_app():
     app = web.Application()
