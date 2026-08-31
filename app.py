@@ -238,6 +238,10 @@ for region in region_keys:
     builder.adjust(1)
     Cities[region] = builder.as_markup()
 
+RulesInlineKeyboardBuilder = InlineKeyboardBuilder()
+RulesInlineKeyboardBuilder.button(text="✅ Принимаю", callback_data="accept_rules")
+RulesInlineKeyboard = RulesInlineKeyboardBuilder.as_markup()
+
 # ---------- Валидация ----------
 FieldLimits = {
     "name": (1, 50),
@@ -468,7 +472,7 @@ async def print_menu(message: types.Message):
 
 async def start_form(message: types.Message, user_id: int):
     if await get_field(user_id, "form") != "true":
-        await message.answer(Phrases["RulesMessage"], reply_markup=RulesKeyboard, parse_mode="HTML")
+        await message.answer(Phrases["RulesMessage"], reply_markup=RulesInlineKeyboard, parse_mode="HTML")
         await set_string_field(user_id, "action", "rules")
     else:
         await message.answer(Phrases['nameMessage'], parse_mode="HTML")
@@ -579,11 +583,12 @@ async def text(message: types.Message):
 
     # 3. Обработка состояний (action)
     if action == "rules":
-        if text == RulesButtons["Accept"]:
-            await message.answer(Phrases['nameMessage'], parse_mode="HTML")
-            await set_string_field(user_id, "action", "name")
-        else:
-            await message.answer("Пожалуйста, подтверди согласие с правилами, чтобы продолжить.", reply_markup=RulesKeyboard)
+        # Если пользователь ещё не принял правила, напоминаем
+        await message.answer(
+            "Пожалуйста, примите правила, нажав кнопку ниже.",
+            reply_markup=RulesInlineKeyboard,
+            parse_mode="HTML"
+        )
         return
 
     if action in Actions:
@@ -826,6 +831,15 @@ async def callback_query(callback: CallbackQuery):
             await callback.answer()
             await set_string_field(user_id, "action", "None")
             await cmd_find(callback.message, user_id=user_id)
+        elif data == "accept_rules":
+            await callback.answer()
+            await set_string_field(user_id, "action", "name")
+            # Редактируем сообщение с правилами, убираем кнопку и показываем вопрос
+            await callback.message.edit_text(
+                "✅ Правила приняты! Теперь заполним анкету.\n\n" + Phrases['nameMessage'],
+                parse_mode="HTML"
+            )
+            return
         else:
             await callback.answer("Действие устарело, начните заново.")
             await set_string_field(user_id, "action", "None")
