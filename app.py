@@ -831,18 +831,20 @@ async def callback_query(callback: CallbackQuery):
             await callback.answer()
             await set_string_field(user_id, "action", "None")
             await cmd_find(callback.message, user_id=user_id)
-        elif data == "accept_rules":
-            await callback.answer()
-            await set_string_field(user_id, "action", "name")
-            # Редактируем сообщение с правилами, убираем кнопку и показываем вопрос
-            await callback.message.edit_text(
-                "✅ Правила приняты! Теперь заполним анкету.\n\n" + Phrases['nameMessage'],
-                parse_mode="HTML"
-            )
-            return
+
         else:
             await callback.answer("Действие устарело, начните заново.")
             await set_string_field(user_id, "action", "None")
+
+    elif data == "accept_rules":
+        await callback.answer()
+        await set_string_field(user_id, "action", "name")
+        # Редактируем сообщение с правилами, убираем кнопку и показываем вопрос
+        await callback.message.edit_text(
+            "✅ Правила приняты! Теперь заполним анкету.\n\n" + Phrases['nameMessage'],
+            parse_mode="HTML"
+        )
+        return
     else:
         await callback.answer()
         await bot.send_message(user_id, data)
