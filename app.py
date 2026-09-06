@@ -798,6 +798,7 @@ async def callback_query(callback: CallbackQuery):
             await set_string_field(liked_user_id, "state", "seen", table="views", additional_field="viewed_user_id", additional_value=user_id)
             await set_string_field(user_id, "state", "seen", table="views", additional_field="viewed_user_id", additional_value=liked_user_id)
             await callback.answer()
+            await callback.message.edit_reply_markup(reply_markup=None)
             if reaction == "dislike":
                 await cmd_likes(callback.message, user_id=user_id)
             return
