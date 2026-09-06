@@ -795,6 +795,7 @@ async def callback_query(callback: CallbackQuery):
             elif reaction == "report":
                 current_reports = await get_field(liked_user_id, "reports") or 0
                 await set_int_field(liked_user_id, "reports", current_reports + 1)
+                await cmd_likes(callback.message, user_id=user_id)
             await set_string_field(liked_user_id, "state", "seen", table="views", additional_field="viewed_user_id", additional_value=user_id)
             await set_string_field(user_id, "state", "seen", table="views", additional_field="viewed_user_id", additional_value=liked_user_id)
             await callback.answer()
