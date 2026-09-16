@@ -65,7 +65,8 @@ Phrases = {
         "👋 Привет! Я бот <b>Livether</b> — твой помощник в поиске идеального соседа для совместной аренды! 🏠\n\n"
         "Мы подберём тебе друга, с которым будет комфортно делить квартиру и быт. 😊\n\n"
         "Чтобы начать, заполни анкету — это займёт всего пару минут! 📝\n"
-        "Просто нажми /form или выбери пункт в меню."
+        "Просто нажми /form или выбери пункт в меню.\n\n"
+        "⚠️ Бот не отвечает? Загляните в резервные @my_lde_bot или @my_ldf_bot — ваши анкеты уже там. \n О проблеме сообщите @tveetoo. \n"
 #        "\n УБЕДИТЕЛЬНАЯ ПРОСЬБА ДЛЯ ТЕСТИРОВЩИКОВ \n НЕ ПИШИТЕ ПОЖАЛУЙСТА \n 🤖',' говно жопа пенис); DROP TABLE vibe_code; -- \n В КАКИЕ ЛИБО ПОЛЯ АНКЕТЫ \n ЭТА ХРЕНЬ ЛОЖИТ ВЕБХУК И Я НЕ МОГУ ЕЁ ПАРСИТЬ/ПЕРЕХВАТЫВАТЬ \n НОРМАЛЬНЫЕ ЛЮДИ ТАКОЙ ХУЙНЁЙ Не ЗАНИМАЮТСЯ"
     ),
     "nameMessage": (
@@ -138,7 +139,11 @@ Phrases = {
         "1️⃣6️⃣ Бот не проверяет достоверность указанных данных — будьте внимательны при личной встрече.\n"
         "1️⃣7️⃣ Изменение города или анкеты может обновить список анкет, доступных для поиска.\n\n"
         "Нажми «Принимаю», чтобы продолжить заполнение анкеты."
-    )
+    ),
+    "ReserveInfo": (
+        "⚠️ Бот не отвечает? Загляните в резервные @my_lde_bot или @my_ldf_bot — ваши анкеты уже там. "
+        "О проблеме сообщите @tveetoo."
+    ),
 }
 
 # ---------- Кнопки ----------
@@ -672,6 +677,11 @@ async def cmd(message: types.Message):
         report = await run_diagnostics()
         await message.answer(report)
 
+    elif text == "cmd_reserveinfo":
+        await message.answer("⏳ Начинаю рассылку...")
+        sent, failed = await send_reserve_info_to_all()
+        await message.answer(f"✅ Рассылка завершена.\nОтправлено: {sent}\nОшибок: {failed}")
+
     else:
         await message.answer("Неизвестная админ-команда.")
 
@@ -691,6 +701,24 @@ async def run_diagnostics() -> str:
         results.append(f"❌ Ошибка бота: {e}")
 
     return f"🔧 Диагностика {BOT_NAME}\n\n" + "\n".join(results)
+
+async def send_reserve_info_to_all():
+    """Отправляет сообщение о резервных ботах всем пользователям из БД."""
+    def _get_all_ids():
+        resp = supabase.table("users").select("user_id").execute()
+        return [row["user_id"] for row in resp.data]
+
+    user_ids = await asyncio.to_thread(_get_all_ids)
+    sent = 0
+    failed = 0
+    for uid in user_ids:
+        try:
+            await bot.send_message(uid, Phrases["ReserveInfo"])
+            sent += 1
+        except Exception as e:
+            failed += 1
+            logger.warning(f"Не удалось отправить сообщение {uid}: {e}")
+    return sent, failed
 
 def clear_all_data_sync():
     supabase.table("views").delete().neq("user_id", -1).execute()
