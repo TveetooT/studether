@@ -18,6 +18,9 @@ from supabase import create_client
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from aiogram.types import WebAppInfo
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ---------- Импорт регионов ----------
 from regions import Regions
@@ -1148,6 +1151,147 @@ async def webhook_refresher():
         except Exception as e:
             logger.error(f"❌ Ошибка при переустановке вебхука: {e}")
 
+WEBAPP_DIR = Path(__file__).parent / "webapp"
+
+async def webapp_index(request):
+    return web.FileResponse(WEBAPP_DIR / "index.html")
+
+async def webapp_regions(request):
+    return web.json_response({"regions": Regions})
+
+async def webapp_profile(request):
+    if request.method == "GET":
+        user_id = int(request.query.get("user_id", 0))
+        if not user_id:
+            return web.json_response({"error": "no user_id"}, status=400)
+        data = await get_user_sync(user_id)
+        if not data:
+            return web.json_response({"error": "not found"}, status=404)
+        return web.json_response({
+            "name": data.get("name") or "",
+            "age": data.get("age"),
+            "univer": data.get("univer") or "",
+            "about": data.get("about") or "",
+            "requirements": data.get("requirements") or "",
+            "region": data.get("region") or "",
+            "city": data.get("city") or "",
+        })
+
+    elif request.method == "POST":
+        try:
+            payload = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid json"}, status=400)
+        user_id = payload.get("user_id")
+        if not user_id:
+            return web.json_response({"error": "no user_id"}, status=400)
+
+        def _update():
+            supabase.table("users").update({
+                "name": payload.get("name") or None,
+                "age": payload.get("age"),
+                "univer": payload.get("univer") or None,
+                "about": payload.get("about") or None,
+                "requirements": payload.get("requirements") or None,
+                "region": payload.get("region") or None,
+                "city": payload.get("city") or None,
+            }).eq("user_id", user_id).execute()
+
+        await asyncio.to_thread(_update)
+        return web.json_response({"ok": True})
+
+async def webapp_find(request):
+    user_id = int(request.query.get("user_id", 0))
+    if not user_id:
+        return web.json_response({"error": "no user_id"}, status=400)
+    city = await get_field(user_id, "city")
+    if not city:
+        return web.json_response({"error": "Сначала укажите город в анкете"})
+    form = await get_unseen_form(user_id, city)
+    if form is None:
+        return web.json_response({"profile": None})
+    return web.json_response({
+        "profile": {
+            "user_id": form.get("user_id"),
+            "name": form.get("name") or "",
+            "age": form.get("age"),
+            "univer": form.get("univer") or "",
+            "about": form.get("about") or "",
+            "requirements": form.get("requirements") or "",
+        }
+    })
+
+async def webapp_view(request):
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid json"}, status=400)
+
+    user_id = payload.get("user_id")
+    viewed_id = payload.get("viewed_user_id")
+    reaction = payload.get("reaction")
+
+    if not all([user_id, viewed_id, reaction]):
+        return web.json_response({"error": "missing fields"}, status=400)
+
+    if reaction == "like":
+        mutual_state = await get_field(
+            viewed_id, "state", table="views",
+            additional_field="viewed_user_id", additional_value=user_id
+        )
+        if mutual_state == "like_unseen":
+            liker_username = await get_field(user_id, "username")
+            liked_username = await get_field(viewed_id, "username")
+            liker_name = f"@{liker_username}" if liker_username else "пользователь без username"
+            liked_name = f"@{liked_username}" if liked_username else "пользователь без username"
+            try:
+                await bot.send_message(viewed_id, f"Совпадение с {liker_name}! Свяжитесь чтобы обсудить сожительство!")
+                await bot.send_message(user_id, f"Совпадение с {liked_name}! Свяжитесь чтобы обсудить сожительство!")
+            except Exception as e:
+                logger.warning(f"Не удалось отправить уведомление: {e}")
+            await set_string_field(viewed_id, "state", "seen", table="views",
+                                   additional_field="viewed_user_id", additional_value=user_id)
+            await set_string_field(user_id, "state", "seen", table="views",
+                                   additional_field="viewed_user_id", additional_value=viewed_id)
+        else:
+            await set_string_field(user_id, "state", "like_unseen", table="views",
+                                   additional_field="viewed_user_id", additional_value=viewed_id)
+
+    elif reaction == "dislike":
+        await set_string_field(user_id, "state", "seen", table="views",
+                               additional_field="viewed_user_id", additional_value=viewed_id)
+
+    elif reaction == "report":
+        current_reports = await get_field(viewed_id, "reports") or 0
+        await set_int_field(viewed_id, "reports", current_reports + 1)
+        await set_string_field(user_id, "state", "seen", table="views",
+                               additional_field="viewed_user_id", additional_value=viewed_id)
+
+    return web.json_response({"ok": True})
+
+async def webapp_likes(request):
+    user_id = int(request.query.get("user_id", 0))
+    if not user_id:
+        return web.json_response({"error": "no user_id"}, status=400)
+
+    def _sync():
+        return supabase.table("views").select("*").eq("viewed_user_id", user_id).eq("state", "like_unseen").execute().data
+
+    likes = await asyncio.to_thread(_sync)
+    profiles = []
+    for like in likes:
+        liked_user_id = like["user_id"]
+        form = await get_user_sync(liked_user_id)
+        if form:
+            profiles.append({
+                "user_id": form.get("user_id"),
+                "name": form.get("name") or "",
+                "age": form.get("age"),
+                "univer": form.get("univer") or "",
+                "about": form.get("about") or "",
+                "requirements": form.get("requirements") or "",
+            })
+    return web.json_response({"likes": profiles})
 # ---------- Веб-сервер ----------
 async def on_startup(app: web.Application):
     await bot.delete_webhook(drop_pending_updates=True)
@@ -1168,6 +1312,13 @@ def create_app():
     app.router.add_post("/admin/ban/{user_id}", admin_ban)
     app.router.add_get("/admin/stats", admin_stats)
     app.router.add_get("/admin/logout", admin_logout)
+    app.router.add_get("/webapp", webapp_index)
+    app.router.add_get("/webapp/api/regions", webapp_regions)
+    app.router.add_get("/webapp/api/profile", webapp_profile)
+    app.router.add_post("/webapp/api/profile", webapp_profile)
+    app.router.add_get("/webapp/api/find", webapp_find)
+    app.router.add_post("/webapp/api/view", webapp_view)
+    app.router.add_get("/webapp/api/likes", webapp_likes)
     # webhook
     from aiogram.webhook import aiohttp_server
     webhook_requests = aiohttp_server.SimpleRequestHandler(dispatcher=dp, bot=bot)

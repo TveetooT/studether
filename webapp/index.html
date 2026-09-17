@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <title>Livether</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--tg-theme-bg-color, #f0f2f5);
+            color: var(--tg-theme-text-color, #1a1a2e);
+            padding: 16px;
+            padding-bottom: 80px;
+            min-height: 100vh;
+        }
+        .tab-bar {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            display: flex;
+            background: var(--tg-theme-secondary-bg-color, #fff);
+            border-top: 1px solid rgba(0,0,0,0.08);
+            z-index: 100;
+        }
+        .tab-bar button {
+            flex: 1;
+            padding: 12px 4px;
+            background: none;
+            border: none;
+            font-size: 12px;
+            color: var(--tg-theme-hint-color, #888);
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .tab-bar button.active {
+            color: var(--tg-theme-button-color, #0f3460);
+            font-weight: 600;
+        }
+        .tab-bar button span { display: block; font-size: 20px; margin-bottom: 2px; }
+        h1 { font-size: 22px; margin-bottom: 16px; }
+        .field {
+            background: var(--tg-theme-secondary-bg-color, #fff);
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+        }
+        .field label {
+            display: block;
+            font-size: 13px;
+            color: var(--tg-theme-hint-color, #888);
+            margin-bottom: 4px;
+        }
+        .field input, .field textarea, .field select {
+            width: 100%;
+            border: none;
+            background: transparent;
+            color: var(--tg-theme-text-color, #1a1a2e);
+            font-size: 16px;
+            font-family: inherit;
+            outline: none;
+            resize: none;
+        }
+        button.action {
+            width: 100%;
+            padding: 14px;
+            background: var(--tg-theme-button-color, #0f3460);
+            color: var(--tg-theme-button-text-color, #fff);
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        button.action:active { opacity: 0.8; }
+        .status { text-align: center; margin-top: 12px; font-size: 14px; color: var(--tg-theme-hint-color, #888); }
+        .hidden { display: none !important; }
+        .profile-card {
+            background: var(--tg-theme-secondary-bg-color, #fff);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        .profile-card h2 { font-size: 20px; margin-bottom: 4px; }
+        .profile-card .sub { color: var(--tg-theme-hint-color, #888); font-size: 14px; margin-bottom: 16px; }
+        .profile-card .section { margin-bottom: 14px; }
+        .profile-card .section .label { font-size: 12px; color: var(--tg-theme-hint-color, #888); text-transform: uppercase; letter-spacing: 0.5px; }
+        .profile-card .section .value { font-size: 15px; margin-top: 4px; white-space: pre-wrap; }
+        .action-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .action-row button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 20px;
+            cursor: pointer;
+            background: var(--tg-theme-secondary-bg-color, #fff);
+        }
+        .btn-like { background: #e6f7e6 !important; }
+        .btn-dislike { background: #ffe6e6 !important; }
+        .btn-report { background: #fff4e6 !important; }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <div class="tab-bar">
+        <button id="tab-profile" onclick="switchTab('profile')">
+            <span>👤</span>Анкета
+        </button>
+        <button id="tab-find" onclick="switchTab('find')">
+            <span>🔍</span>Поиск
+        </button>
+        <button id="tab-likes" onclick="switchTab('likes')">
+            <span>📬</span>Запросы
+        </button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        const USER_ID = tg.initDataUnsafe.user.id;
+        const API = '/webapp/api';
+
+        let regions = {};
+        let currentTab = 'profile';
+        let currentViewId = null;
+
+        // ---------- Утилиты ----------
+        function el(tag, attrs, children) {
+            const e = document.createElement(tag);
+            if (attrs) for (const k in attrs) {
+                if (k === 'onclick') e.onclick = attrs[k];
+                else if (k === 'class') e.className = attrs[k];
+                else e.setAttribute(k, attrs[k]);
+            }
+            if (children) (Array.isArray(children) ? children : [children]).forEach(c => {
+                if (typeof c === 'string') e.appendChild(document.createTextNode(c));
+                else if (c) e.appendChild(c);
+            });
+            return e;
+        }
+
+        async function api(path, opts) {
+            const resp = await fetch(`${API}${path}`, opts);
+            return resp.json();
+        }
+
+        function setStatus(text, id) {
+            const s = document.getElementById(id || 'status');
+            if (s) s.textContent = text;
+        }
+
+        // ---------- Вкладки ----------
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            render();
+        }
+
+        async function render() {
+            const app = document.getElementById('app');
+            app.innerHTML = '<div class="status">Загрузка...</div>';
+            if (currentTab === 'profile') await renderProfile(app);
+            else if (currentTab === 'find') await renderFind(app);
+            else if (currentTab === 'likes') await renderLikes(app);
+        }
+
+        // ---------- Вкладка "Анкета" ----------
+        async function renderProfile(app) {
+            const data = await api(`/profile?user_id=${USER_ID}`);
+            if (data.error) {
+                app.innerHTML = '<div class="status">Профиль не найден. Запустите бота командой /start</div>';
+                return;
+            }
+
+            app.innerHTML = '';
+            app.appendChild(el('h1', {}, '👤 Моя анкета'));
+
+            const fields = [
+                ['name', 'Имя', 'text', 50],
+                ['age', 'Возраст', 'number', null],
+                ['univer', 'Учебное заведение', 'text', 100],
+                ['about', 'О себе', 'textarea', 1000],
+                ['requirements', 'Пожелания к соседу', 'textarea', 1000],
+            ];
+
+            fields.forEach(([key, label, type, max]) => {
+                const field = el('div', { class: 'field' });
+                field.appendChild(el('label', {}, label));
+                const input = type === 'textarea'
+                    ? el('textarea', { id: key, rows: 4 })
+                    : el('input', { id: key, type });
+                if (max) input.setAttribute('maxlength', max);
+                if (type === 'number') {
+                    input.setAttribute('min', 16);
+                    input.setAttribute('max', 100);
+                }
+                input.value = data[key] || '';
+                field.appendChild(input);
+                app.appendChild(field);
+            });
+
+            // Регион
+            const regionField = el('div', { class: 'field' });
+            regionField.appendChild(el('label', {}, 'Регион'));
+            const regionSelect = el('select', { id: 'region' });
+            regionSelect.appendChild(el('option', { value: '' }, '— выберите регион —'));
+            Object.keys(regions).forEach(r => {
+                const opt = el('option', { value: r }, r);
+                if (r === data.region) opt.selected = true;
+                regionSelect.appendChild(opt);
+            });
+            regionField.appendChild(regionSelect);
+            app.appendChild(regionField);
+
+            // Город
+            const cityField = el('div', { class: 'field' });
+            cityField.appendChild(el('label', {}, 'Город'));
+            const citySelect = el('select', { id: 'city' });
+            cityField.appendChild(citySelect);
+            app.appendChild(cityField);
+
+            function fillCities(region, selected) {
+                citySelect.innerHTML = '';
+                citySelect.appendChild(el('option', { value: '' }, '— выберите город —'));
+                if (regions[region]) {
+                    regions[region].forEach(c => {
+                        const opt = el('option', { value: c }, c);
+                        if (c === selected) opt.selected = true;
+                        citySelect.appendChild(opt);
+                    });
+                }
+            }
+
+            regionSelect.onchange = () => fillCities(regionSelect.value, null);
+            fillCities(data.region, data.city);
+
+            const saveBtn = el('button', { class: 'action', onclick: saveProfile }, '💾 Сохранить');
+            app.appendChild(saveBtn);
+            app.appendChild(el('div', { class: 'status', id: 'status' }, ''));
+        }
+
+        async function saveProfile() {
+            setStatus('Сохранение...');
+            const payload = {
+                user_id: USER_ID,
+                name: document.getElementById('name').value.trim(),
+                age: parseInt(document.getElementById('age').value, 10) || null,
+                univer: document.getElementById('univer').value.trim(),
+                about: document.getElementById('about').value.trim(),
+                requirements: document.getElementById('requirements').value.trim(),
+                region: document.getElementById('region').value,
+                city: document.getElementById('city').value,
+            };
+            const res = await api('/profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            if (res.ok) {
+                setStatus('✅ Сохранено');
+                tg.HapticFeedback.notificationOccurred('success');
+            } else {
+                setStatus('❌ ' + (res.error || 'Ошибка'));
+            }
+        }
+
+        // ---------- Вкладка "Поиск" ----------
+        async function renderFind(app) {
+            app.innerHTML = '';
+            app.appendChild(el('h1', {}, '🔍 Поиск соседа'));
+            const data = await api(`/find?user_id=${USER_ID}`);
+
+            if (data.error) {
+                app.innerHTML = `<div class="status">${data.error}</div>`;
+                return;
+            }
+            if (!data.profile) {
+                app.innerHTML = '<div class="status">Нет доступных анкет в вашем городе</div>';
+                const btn = el('button', { class: 'action', onclick: () => switchTab('profile') }, 'Заполнить анкету');
+                app.appendChild(btn);
+                return;
+            }
+
+            currentViewId = data.profile.user_id;
+            app.appendChild(buildProfileCard(data.profile));
+
+            const row = el('div', { class: 'action-row' });
+            row.appendChild(el('button', { class: 'btn-like', onclick: () => react('like') }, '👍'));
+            row.appendChild(el('button', { class: 'btn-dislike', onclick: () => react('dislike') }, '👎'));
+            row.appendChild(el('button', { class: 'btn-report', onclick: () => react('report') }, '⚠️'));
+            app.appendChild(row);
+
+            const skipBtn = el('button', { class: 'action', onclick: () => render() }, '➡️ Следующая анкета');
+            app.appendChild(skipBtn);
+        }
+
+        function buildProfileCard(p) {
+            const card = el('div', { class: 'profile-card' });
+            card.appendChild(el('h2', {}, p.name || 'Без имени'));
+            card.appendChild(el('div', { class: 'sub' }, `${p.age || '?'} лет · ${p.univer || ''}`));
+            if (p.about) {
+                const s = el('div', { class: 'section' });
+                s.appendChild(el('div', { class: 'label' }, 'О себе'));
+                s.appendChild(el('div', { class: 'value' }, p.about));
+                card.appendChild(s);
+            }
+            if (p.requirements) {
+                const s = el('div', { class: 'section' });
+                s.appendChild(el('div', { class: 'label' }, 'Пожелания к соседу'));
+                s.appendChild(el('div', { class: 'value' }, p.requirements));
+                card.appendChild(s);
+            }
+            return card;
+        }
+
+        async function react(reaction) {
+            await api('/view', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: USER_ID,
+                    viewed_user_id: currentViewId,
+                    reaction,
+                }),
+            });
+            tg.HapticFeedback.impactOccurred('light');
+            await render();
+        }
+
+        // ---------- Вкладка "Запросы" ----------
+        async function renderLikes(app) {
+            app.innerHTML = '';
+            app.appendChild(el('h1', {}, '📬 Запросы на сожительство'));
+            const data = await api(`/likes?user_id=${USER_ID}`);
+
+            if (!data.likes || data.likes.length === 0) {
+                app.innerHTML += '<div class="status">Нет новых лайков</div>';
+                return;
+            }
+
+            data.likes.forEach(p => {
+                const card = buildProfileCard(p);
+                const row = el('div', { class: 'action-row' });
+                row.appendChild(el('button', { class: 'btn-like', onclick: () => likeBack(p.user_id) }, '👍 Ответить'));
+                row.appendChild(el('button', { class: 'btn-dislike', onclick: () => skipLike(p.user_id) }, '👎 Пропустить'));
+                card.appendChild(row);
+                app.appendChild(card);
+            });
+        }
+
+        async function likeBack(likedUserId) {
+            await api('/view', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: USER_ID,
+                    viewed_user_id: likedUserId,
+                    reaction: 'like',
+                }),
+            });
+            tg.HapticFeedback.notificationOccurred('success');
+            await render();
+        }
+
+        async function skipLike(likedUserId) {
+            await api('/view', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: USER_ID,
+                    viewed_user_id: likedUserId,
+                    reaction: 'dislike',
+                }),
+            });
+            await render();
+        }
+
+        // ---------- Старт ----------
+        (async () => {
+            const r = await api('/regions');
+            regions = r.regions || {};
+            switchTab('profile');
+        })();
+    </script>
+</body>
+</html>
