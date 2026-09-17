@@ -336,10 +336,15 @@ def delete_user_sync(user_id: int):
 
 async def add_view(user_id: int, viewed_user_id: int, state: str = "unseen"):
     def _update():
-        return supabase.table("views").upsert(
-            {"user_id": user_id, "viewed_user_id": viewed_user_id, "state": state},
-            on_conflict="user_id,viewed_user_id",
-            ignore_duplicates=True,
+        existing = supabase.table("views")\
+            .select("state")\
+            .eq("user_id", user_id)\
+            .eq("viewed_user_id", viewed_user_id)\
+            .execute()
+        if existing.data:
+            return existing
+        return supabase.table("views").insert(
+            {"user_id": user_id, "viewed_user_id": viewed_user_id, "state": state}
         ).execute()
     await asyncio.to_thread(_update)
 
@@ -353,9 +358,30 @@ async def increment_views_count(user_id: int):
     await asyncio.to_thread(_sync)
 
 async def get_unseen_form(user_id: int, city: str):
+    # 1. Проверяем, есть ли уже активная непросмотренная анкета (state='unseen')
+    def _check_existing():
+        return supabase.table("views")\
+            .select("viewed_user_id")\
+            .eq("user_id", user_id)\
+            .eq("state", "unseen")\
+            .limit(1)\
+            .execute()
+
+    existing = await asyncio.to_thread(_check_existing)
+    if existing.data:
+        viewed_id = existing.data[0]["viewed_user_id"]
+        form = await get_user_sync(viewed_id)
+        if form:
+            return form
+        # Если анкета удалена, но запись в views осталась — чистим её и идём дальше
+        await set_string_field(user_id, "state", "seen", table="views",
+                               additional_field="viewed_user_id", additional_value=viewed_id)
+
+    # 2. Иначе выбираем новую анкету
     def _sync():
         response = supabase.rpc("get_unseen_users", {"p_user_id": user_id, "p_city": city}).execute()
         return response.data
+
     candidates = await asyncio.to_thread(_sync)
     if not candidates:
         return None
@@ -381,7 +407,7 @@ async def get_unseen_form(user_id: int, city: str):
         weights.append(weight)
 
     selected = random.choices(candidates, weights=weights, k=1)[0]
-    await add_view(user_id, selected["user_id"])
+    await add_view(user_id, selected["user_id"], state="unseen")
     await increment_views_count(selected["user_id"])
     await set_string_field(user_id, "last_active", datetime.now(timezone.utc).isoformat())
     return selected
