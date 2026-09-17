@@ -1048,33 +1048,81 @@ async def admin_users(request):
     if not is_admin(request):
         return web.HTTPFound("/admin")
     page = int(request.query.get('page', 1))
-    per_page = 20
+    per_page = 10
     offset = (page - 1) * per_page
+
     def _list():
         resp = supabase.table("users").select("*").order("user_id").range(offset, offset + per_page - 1).execute()
         return resp.data
+
     users = await asyncio.to_thread(_list)
 
     rows = ""
     for u in users:
+        def esc(v):
+            return html.escape(str(v)) if v is not None else '—'
+
+        name = esc(u.get('name'))
+        age = esc(u.get('age'))
+        univer = esc(u.get('univer'))
+        city = esc(u.get('city'))
+        region = esc(u.get('region'))
+        about = esc(u.get('about'))
+        requirements = esc(u.get('requirements'))
+        form = u.get('form') == 'true'
+        root = u.get('root') == 'true'
+        banned = u.get('banned') is True
+        reports = u.get('reports', 0)
+        views_count = u.get('views_count', 0)
+        last_active = esc(u.get('last_active'))
+        created_at = esc(u.get('created_at'))
+        action = esc(u.get('action'))
+
+        row_id = f"user-{u['user_id']}"
+
         rows += f"""
-        <tr>
+        <tr class="user-row">
             <td>{u['user_id']}</td>
-            <td>@{u.get('username', '-')}</td>
-            <td>{html.escape(u.get('name') or '')}</td>
-            <td>{u.get('age', '')}</td>
-            <td>{html.escape(u.get('city') or '')}</td>
-            <td>{u.get('form') == 'true' and '✅' or '❌'}</td>
-            <td>{u.get('reports', 0)}</td>
-            <td>{u.get('views_count', 0)}</td>
-            <td>{u.get('banned') and '🚫' or ''}</td>
+            <td>@{esc(u.get('username'))}</td>
+            <td>{name}</td>
+            <td>{age}</td>
+            <td>{city}</td>
+            <td>{'✅' if form else '❌'}</td>
+            <td>{'🔐' if root else ''}</td>
+            <td>{'🚫' if banned else ''}</td>
+            <td>{reports}</td>
+            <td>{views_count}</td>
             <td>
+                <button class="btn-toggle" onclick="toggle('{row_id}')">📄</button>
                 <form style="display:inline" method="POST" action="/admin/delete/{u['user_id']}" onsubmit="return confirm('Удалить анкету?')">
                     <button type="submit">🗑️</button>
                 </form>
                 <form style="display:inline" method="POST" action="/admin/ban/{u['user_id']}">
-                    <button type="submit">{"🚫" if not u.get('banned') else "✅"}</button>
+                    <button type="submit">{'✅' if banned else '🚫'}</button>
                 </form>
+            </td>
+        </tr>
+        <tr id="{row_id}" class="details-row" style="display:none">
+            <td colspan="11">
+                <div class="details">
+                    <div class="detail"><span class="lbl">user_id:</span> {u['user_id']}</div>
+                    <div class="detail"><span class="lbl">username:</span> @{esc(u.get('username'))}</div>
+                    <div class="detail"><span class="lbl">name:</span> {name}</div>
+                    <div class="detail"><span class="lbl">age:</span> {age}</div>
+                    <div class="detail"><span class="lbl">region:</span> {region}</div>
+                    <div class="detail"><span class="lbl">city:</span> {city}</div>
+                    <div class="detail"><span class="lbl">univer:</span> {univer}</div>
+                    <div class="detail full"><span class="lbl">about:</span> {about}</div>
+                    <div class="detail full"><span class="lbl">requirements:</span> {requirements}</div>
+                    <div class="detail"><span class="lbl">form:</span> {esc(u.get('form'))}</div>
+                    <div class="detail"><span class="lbl">action:</span> {action}</div>
+                    <div class="detail"><span class="lbl">root:</span> {esc(u.get('root'))}</div>
+                    <div class="detail"><span class="lbl">reports:</span> {reports}</div>
+                    <div class="detail"><span class="lbl">views_count:</span> {views_count}</div>
+                    <div class="detail"><span class="lbl">banned:</span> {esc(u.get('banned'))}</div>
+                    <div class="detail"><span class="lbl">last_active:</span> {last_active}</div>
+                    <div class="detail"><span class="lbl">created_at:</span> {created_at}</div>
+                </div>
             </td>
         </tr>
         """
@@ -1083,18 +1131,34 @@ async def admin_users(request):
     <!DOCTYPE html>
     <html><head><meta charset="utf-8"><title>Пользователи</title>
     <style>
-        body{{font-family:sans-serif;max-width:1200px;margin:20px auto;padding:20px;background:#f0f2f5;}}
+        body{{font-family:sans-serif;max-width:1500px;margin:20px auto;padding:20px;background:#f0f2f5;}}
         table{{width:100%;border-collapse:collapse;background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);}}
-        th,td{{padding:10px;text-align:left;border-bottom:1px solid #eee;}}
+        th,td{{padding:10px;text-align:left;border-bottom:1px solid #eee;font-size:14px;vertical-align:top;}}
         th{{background:#0f3460;color:white;}}
+        .user-row:hover{{background:#f8f9fa;}}
+        .details-row td{{background:#f8f9fa;padding:16px;}}
+        .details{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}}
+        .detail{{background:white;padding:8px 12px;border-radius:8px;font-size:13px;}}
+        .detail.full{{grid-column:1/-1;}}
+        .detail .lbl{{color:#888;font-weight:600;margin-right:4px;}}
+        .btn-toggle{{background:#0f3460;color:white;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;margin-right:4px;}}
         .nav{{display:flex;gap:10px;margin-top:20px;}}
         .nav a{{background:#0f3460;color:white;padding:8px 16px;border-radius:8px;text-decoration:none;}}
         .logout{{float:right;}}
     </style>
+    <script>
+        function toggle(id) {{
+            const el = document.getElementById(id);
+            el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+        }}
+    </script>
     </head><body>
         <h1>👥 Пользователи <span class="logout"><a href="/admin/logout">Выйти</a></span></h1>
         <table>
-            <tr><th>ID</th><th>Username</th><th>Имя</th><th>Возраст</th><th>Город</th><th>Анкета</th><th>Жалобы</th><th>Просмотры</th><th>Бан</th><th>Действия</th></tr>
+            <tr>
+                <th>ID</th><th>Username</th><th>Имя</th><th>Возраст</th><th>Город</th>
+                <th>Анкета</th><th>Root</th><th>Бан</th><th>Жалобы</th><th>Просм.</th><th>Действия</th>
+            </tr>
             {rows}
         </table>
         <div class="nav">
