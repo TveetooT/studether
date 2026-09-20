@@ -698,7 +698,7 @@
     // ---------- Start ----------
     (async () => {
       try {
-        const r = await api('/webapp2/api/regions');
+        const r = await api('/regions');
         regions = r.regions || {};
       } catch (e) {
         console.error('Regions failed', e);

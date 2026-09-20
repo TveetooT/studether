@@ -1403,6 +1403,7 @@ def create_app():
     app.router.add_get("/admin/stats", admin_stats)
     app.router.add_get("/admin/logout", admin_logout)
     app.router.add_get("/webapp2", webapp_index)
+    app.router.add_get("/webapp2/", webapp_index)
     app.router.add_get("/webapp2/api/regions", webapp_regions)
     app.router.add_get("/webapp2/api/profile", webapp_profile)
     app.router.add_post("/webapp2/api/profile", webapp_profile)
