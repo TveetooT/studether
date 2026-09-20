@@ -1,396 +1,628 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-    <title>Livether</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--tg-theme-bg-color, #f0f2f5);
-            color: var(--tg-theme-text-color, #1a1a2e);
-            padding: 16px;
-            padding-bottom: 80px;
-            min-height: 100vh;
-        }
-        .tab-bar {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            display: flex;
-            background: var(--tg-theme-secondary-bg-color, #fff);
-            border-top: 1px solid rgba(0,0,0,0.08);
-            z-index: 100;
-        }
-        .tab-bar button {
-            flex: 1;
-            padding: 12px 4px;
-            background: none;
-            border: none;
-            font-size: 12px;
-            color: var(--tg-theme-hint-color, #888);
-            cursor: pointer;
-            font-family: inherit;
-        }
-        .tab-bar button.active {
-            color: var(--tg-theme-button-color, #0f3460);
-            font-weight: 600;
-        }
-        .tab-bar button span { display: block; font-size: 20px; margin-bottom: 2px; }
-        h1 { font-size: 22px; margin-bottom: 16px; }
-        .field {
-            background: var(--tg-theme-secondary-bg-color, #fff);
-            border-radius: 12px;
-            padding: 12px 16px;
-            margin-bottom: 12px;
-        }
-        .field label {
-            display: block;
-            font-size: 13px;
-            color: var(--tg-theme-hint-color, #888);
-            margin-bottom: 4px;
-        }
-        .field input, .field textarea, .field select {
-            width: 100%;
-            border: none;
-            background: transparent;
-            color: var(--tg-theme-text-color, #1a1a2e);
-            font-size: 16px;
-            font-family: inherit;
-            outline: none;
-            resize: none;
-        }
-        button.action {
-            width: 100%;
-            padding: 14px;
-            background: var(--tg-theme-button-color, #0f3460);
-            color: var(--tg-theme-button-text-color, #fff);
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 8px;
-        }
-        button.action:active { opacity: 0.8; }
-        .status { text-align: center; margin-top: 12px; font-size: 14px; color: var(--tg-theme-hint-color, #888); }
-        .hidden { display: none !important; }
-        .profile-card {
-            background: var(--tg-theme-secondary-bg-color, #fff);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 16px;
-        }
-        .profile-card h2 { font-size: 20px; margin-bottom: 4px; }
-        .profile-card .sub { color: var(--tg-theme-hint-color, #888); font-size: 14px; margin-bottom: 16px; }
-        .profile-card .section { margin-bottom: 14px; }
-        .profile-card .section .label { font-size: 12px; color: var(--tg-theme-hint-color, #888); text-transform: uppercase; letter-spacing: 0.5px; }
-        .profile-card .section .value { font-size: 15px; margin-top: 4px; white-space: pre-wrap; }
-        .action-row {
-            display: flex;
-            gap: 8px;
-            margin-top: 12px;
-        }
-        .action-row button {
-            flex: 1;
-            padding: 14px;
-            border: none;
-            border-radius: 12px;
-            font-size: 20px;
-            cursor: pointer;
-            background: var(--tg-theme-secondary-bg-color, #fff);
-        }
-        .btn-like { background: #e6f7e6 !important; }
-        .btn-dislike { background: #ffe6e6 !important; }
-        .btn-report { background: #fff4e6 !important; }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Livether</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #f0f2f5);
+      --sec: var(--tg-theme-secondary-bg-color, #ffffff);
+      --text: var(--tg-theme-text-color, #1a1a2e);
+      --hint: var(--tg-theme-hint-color, #8e8e93);
+      --btn: var(--tg-theme-button-color, #0f3460);
+      --btn-text: var(--tg-theme-button-text-color, #ffffff);
+      --accent: #e94560;
+      --success: #2ecc71;
+      --danger: #e74c3c;
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 16px 16px 90px;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .header h1 { font-size: 22px; font-weight: 700; }
+    .badge {
+      background: var(--accent);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 20px;
+      min-width: 20px;
+      text-align: center;
+    }
+
+    /* Cards & fields */
+    .card {
+      background: var(--sec);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .field {
+      margin-bottom: 14px;
+    }
+    .field:last-child { margin-bottom: 0; }
+    .field label {
+      display: block;
+      font-size: 13px;
+      color: var(--hint);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .field input,
+    .field textarea,
+    .field select {
+      width: 100%;
+      border: 1px solid rgba(0,0,0,0.08);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 16px;
+      font-family: inherit;
+      border-radius: 10px;
+      padding: 12px 14px;
+      outline: none;
+      resize: none;
+      -webkit-appearance: none;
+    }
+    .field input:focus,
+    .field textarea:focus,
+    .field select:focus {
+      border-color: var(--btn);
+    }
+    .field textarea { min-height: 90px; }
+
+    /* Buttons */
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      text-align: center;
+      transition: opacity 0.15s;
+    }
+    .btn:active { opacity: 0.75; }
+    .btn-primary {
+      background: var(--btn);
+      color: var(--btn-text);
+      margin-top: 8px;
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--hint);
+      font-size: 14px;
+      margin-top: 10px;
+    }
+
+    /* Profile card (view mode) */
+    .profile-view h2 {
+      font-size: 20px;
+      margin-bottom: 4px;
+    }
+    .profile-view .meta {
+      color: var(--hint);
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+    .profile-view .section {
+      margin-bottom: 14px;
+    }
+    .profile-view .section .lbl {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--hint);
+      margin-bottom: 4px;
+    }
+    .profile-view .section .val {
+      font-size: 15px;
+      white-space: pre-wrap;
+      line-height: 1.45;
+    }
+
+    /* Reaction row */
+    .reactions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .reactions button {
+      flex: 1;
+      padding: 16px 0;
+      border: none;
+      border-radius: 12px;
+      font-size: 22px;
+      cursor: pointer;
+      background: var(--sec);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .reactions .like { background: #e8f8ef; }
+    .reactions .dislike { background: #fdecea; }
+    .reactions .report { background: #fff4e0; }
+
+    /* Status / empty states */
+    .status {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--hint);
+      font-size: 15px;
+      line-height: 1.5;
+    }
+    .status .icon { font-size: 42px; margin-bottom: 12px; }
+    .toast {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1a1a2e;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 24px;
+      font-size: 14px;
+      z-index: 200;
+      opacity: 0;
+      transition: opacity 0.25s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    /* Bottom tab bar */
+    .tabbar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      display: flex;
+      background: var(--sec);
+      border-top: 1px solid rgba(0,0,0,0.07);
+      padding-bottom: env(safe-area-inset-bottom);
+      z-index: 100;
+    }
+    .tabbar button {
+      flex: 1;
+      padding: 10px 4px 8px;
+      background: none;
+      border: none;
+      font-size: 11px;
+      color: var(--hint);
+      font-family: inherit;
+      cursor: pointer;
+      position: relative;
+    }
+    .tabbar button.active {
+      color: var(--btn);
+      font-weight: 600;
+    }
+    .tabbar button .ico {
+      display: block;
+      font-size: 22px;
+      margin-bottom: 2px;
+    }
+    .tabbar .dot {
+      position: absolute;
+      top: 6px;
+      right: calc(50% - 18px);
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+
+    /* Loading spinner */
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid rgba(0,0,0,0.1);
+      border-top-color: var(--btn);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 30px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+  </style>
 </head>
 <body>
-    <div id="app"></div>
+  <div id="toast" class="toast"></div>
+  <div id="app"></div>
 
-    <div class="tab-bar">
-        <button id="tab-profile" onclick="switchTab('profile')">
-            <span>👤</span>Анкета
-        </button>
-        <button id="tab-find" onclick="switchTab('find')">
-            <span>🔍</span>Поиск
-        </button>
-        <button id="tab-likes" onclick="switchTab('likes')">
-            <span>📬</span>Запросы
-        </button>
-    </div>
+  <nav class="tabbar">
+    <button id="tab-profile" onclick="go('profile')">
+      <span class="ico">👤</span>Анкета
+    </button>
+    <button id="tab-find" onclick="go('find')">
+      <span class="ico">🔍</span>Поиск
+    </button>
+    <button id="tab-likes" onclick="go('likes')">
+      <span class="ico">📬</span>Запросы
+      <span id="likes-dot" class="dot hidden"></span>
+    </button>
+  </nav>
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
+  <script>
+    // ---------- Telegram WebApp ----------
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+    tg.enableClosingConfirmation();
 
-        const USER_ID = tg.initDataUnsafe.user.id;
-        const API = '/webapp/api';
+    // Safety: user must come from Telegram
+    if (!tg.initDataUnsafe || !tg.initDataUnsafe.user || !tg.initDataUnsafe.user.id) {
+      document.body.innerHTML = '<div class="status"><div class="icon">🔒</div>Откройте приложение через Telegram-бота</div>';
+      throw new Error('Not inside Telegram');
+    }
 
-        let regions = {};
-        let currentTab = 'profile';
-        let currentViewId = null;
+    const USER_ID = tg.initDataUnsafe.user.id;
+    const API = '/webapp/api';
 
-        // ---------- Утилиты ----------
-        function el(tag, attrs, children) {
-            const e = document.createElement(tag);
-            if (attrs) for (const k in attrs) {
-                if (k === 'onclick') e.onclick = attrs[k];
-                else if (k === 'class') e.className = attrs[k];
-                else e.setAttribute(k, attrs[k]);
-            }
-            if (children) (Array.isArray(children) ? children : [children]).forEach(c => {
-                if (typeof c === 'string') e.appendChild(document.createTextNode(c));
-                else if (c) e.appendChild(c);
-            });
-            return e;
+    // ---------- State ----------
+    let regions = {};
+    let currentTab = 'profile';
+    let currentViewId = null;
+    let likesCount = 0;
+
+    // ---------- Helpers ----------
+    function $(id) { return document.getElementById(id); }
+
+    function toast(msg) {
+      const el = $('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 2200);
+    }
+
+    async function api(path, opts = {}) {
+      const res = await fetch(API + path, {
+        ...opts,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(opts.headers || {})
         }
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Ошибка сети');
+      }
+      return res.json();
+    }
 
-        async function api(path, opts) {
-            const resp = await fetch(`${API}${path}`, opts);
-            return resp.json();
+    function yearWord(age) {
+      if (age == null) return '';
+      const n = Number(age);
+      if (n % 10 === 1 && n % 100 !== 11) return 'год';
+      if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) return 'года';
+      return 'лет';
+    }
+
+    // ---------- Navigation ----------
+    function go(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tabbar button').forEach(b => b.classList.remove('active'));
+      $('tab-' + tab).classList.add('active');
+      render();
+    }
+
+    async function render() {
+      const app = $('app');
+      app.innerHTML = '<div class="spinner"></div>';
+
+      try {
+        if (currentTab === 'profile') await renderProfile(app);
+        else if (currentTab === 'find') await renderFind(app);
+        else if (currentTab === 'likes') await renderLikes(app);
+      } catch (e) {
+        app.innerHTML = `<div class="status"><div class="icon">⚠️</div>${e.message}</div>`;
+      }
+    }
+
+    // ---------- PROFILE ----------
+    async function renderProfile(app) {
+      const data = await api(`/profile?user_id=${USER_ID}`);
+      if (data.error) {
+        app.innerHTML = `<div class="status"><div class="icon">📝</div>Профиль не найден.<br>Напишите боту /start</div>`;
+        return;
+      }
+
+      app.innerHTML = `
+        <div class="header"><h1>👤 Моя анкета</h1></div>
+        <div class="card">
+          <div class="field">
+            <label>Имя / ник</label>
+            <input id="f-name" type="text" maxlength="50" value="${esc(data.name || '')}" placeholder="Как тебя называть">
+          </div>
+          <div class="field">
+            <label>Возраст</label>
+            <input id="f-age" type="number" min="16" max="100" value="${data.age || ''}" placeholder="18">
+          </div>
+          <div class="field">
+            <label>Учебное заведение</label>
+            <input id="f-univer" type="text" maxlength="100" value="${esc(data.univer || '')}" placeholder="ВУЗ или колледж">
+          </div>
+          <div class="field">
+            <label>О себе</label>
+            <textarea id="f-about" maxlength="1000" rows="4" placeholder="Увлечения, образ жизни, привычки...">${esc(data.about || '')}</textarea>
+          </div>
+          <div class="field">
+            <label>Пожелания к соседу</label>
+            <textarea id="f-req" maxlength="1000" rows="4" placeholder="Чистоплотность, режим, животные...">${esc(data.requirements || '')}</textarea>
+          </div>
+          <div class="field">
+            <label>Регион</label>
+            <select id="f-region"></select>
+          </div>
+          <div class="field">
+            <label>Город</label>
+            <select id="f-city"></select>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="save-btn">💾 Сохранить</button>
+        <div id="save-status" class="status" style="padding:12px 0;font-size:14px"></div>
+      `;
+
+      // Populate regions & cities
+      const regionSel = $('f-region');
+      const citySel = $('f-city');
+
+      regionSel.innerHTML = '<option value="">— выберите регион —</option>';
+      Object.keys(regions).sort().forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r;
+        opt.textContent = r;
+        if (r === data.region) opt.selected = true;
+        regionSel.appendChild(opt);
+      });
+
+      function fillCities(selectedCity) {
+        citySel.innerHTML = '<option value="">— выберите город —</option>';
+        const list = regions[regionSel.value] || [];
+        list.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c;
+          opt.textContent = c;
+          if (c === selectedCity) opt.selected = true;
+          citySel.appendChild(opt);
+        });
+      }
+      fillCities(data.city);
+      regionSel.onchange = () => fillCities(null);
+
+      $('save-btn').onclick = saveProfile;
+    }
+
+    async function saveProfile() {
+      const name = $('f-name').value.trim();
+      const ageRaw = $('f-age').value;
+      const age = ageRaw === '' ? null : parseInt(ageRaw, 10);
+      const univer = $('f-univer').value.trim();
+      const about = $('f-about').value.trim();
+      const requirements = $('f-req').value.trim();
+      const region = $('f-region').value;
+      const city = $('f-city').value;
+
+      // Client-side validation (mirrors bot rules)
+      if (!name || name.length > 50) { toast('Имя: 1–50 символов'); return; }
+      if (age !== null && (isNaN(age) || age < 16 || age > 100)) { toast('Возраст 16–100'); return; }
+      if (univer.length > 100) { toast('Учебное заведение слишком длинное'); return; }
+      if (about.length > 1000) { toast('«О себе» — максимум 1000 символов'); return; }
+      if (requirements.length > 1000) { toast('Пожелания — максимум 1000 символов'); return; }
+
+      const btn = $('save-btn');
+      btn.disabled = true;
+      btn.textContent = 'Сохранение…';
+
+      try {
+        await api('/profile', {
+          method: 'POST',
+          body: JSON.stringify({
+            user_id: USER_ID,
+            name, age, univer, about, requirements, region, city
+          })
+        });
+        toast('✅ Сохранено');
+        tg.HapticFeedback.notificationOccurred('success');
+        $('save-status').textContent = 'Анкета обновлена';
+      } catch (e) {
+        toast('❌ ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '💾 Сохранить';
+      }
+    }
+
+    // ---------- FIND ----------
+    async function renderFind(app) {
+      app.innerHTML = `
+        <div class="header"><h1>🔍 Поиск соседа</h1></div>
+        <div class="spinner"></div>
+      `;
+
+      const data = await api(`/find?user_id=${USER_ID}`);
+
+      if (data.error) {
+        app.innerHTML = `
+          <div class="header"><h1>🔍 Поиск соседа</h1></div>
+          <div class="status">
+            <div class="icon">📍</div>
+            ${esc(data.error)}
+            <button class="btn btn-primary" style="margin-top:20px" onclick="go('profile')">Заполнить анкету</button>
+          </div>`;
+        return;
+      }
+
+      if (!data.profile) {
+        app.innerHTML = `
+          <div class="header"><h1>🔍 Поиск соседа</h1></div>
+          <div class="status">
+            <div class="icon">🌆</div>
+            Пока нет доступных анкет<br>в твоём городе
+            <button class="btn btn-ghost" onclick="render()">Обновить</button>
+          </div>`;
+        return;
+      }
+
+      currentViewId = data.profile.user_id;
+      const p = data.profile;
+
+      app.innerHTML = `
+        <div class="header"><h1>🔍 Поиск соседа</h1></div>
+        <div class="card profile-view">
+          <h2>${esc(p.name || 'Без имени')}</h2>
+          <div class="meta">${p.age ? p.age + ' ' + yearWord(p.age) : '?'} · ${esc(p.univer || '')}</div>
+          ${p.about ? `<div class="section"><div class="lbl">О себе</div><div class="val">${esc(p.about)}</div></div>` : ''}
+          ${p.requirements ? `<div class="section"><div class="lbl">Пожелания к соседу</div><div class="val">${esc(p.requirements)}</div></div>` : ''}
+        </div>
+        <div class="reactions">
+          <button class="like" onclick="react('like')">👍</button>
+          <button class="dislike" onclick="react('dislike')">👎</button>
+          <button class="report" onclick="react('report')">⚠️</button>
+        </div>
+        <button class="btn btn-ghost" onclick="render()">➡️ Следующая</button>
+      `;
+    }
+
+    async function react(reaction) {
+      if (!currentViewId) return;
+      try {
+        await api('/view', {
+          method: 'POST',
+          body: JSON.stringify({
+            user_id: USER_ID,
+            viewed_user_id: currentViewId,
+            reaction
+          })
+        });
+        tg.HapticFeedback.impactOccurred('light');
+        if (reaction === 'like') toast('👍 Лайк отправлен');
+        else if (reaction === 'report') toast('⚠️ Жалоба отправлена');
+        await render(); // next card
+      } catch (e) {
+        toast('❌ ' + e.message);
+      }
+    }
+
+    // ---------- LIKES ----------
+    async function renderLikes(app) {
+      app.innerHTML = `
+        <div class="header">
+          <h1>📬 Запросы</h1>
+          ${likesCount ? `<span class="badge">${likesCount}</span>` : ''}
+        </div>
+        <div class="spinner"></div>
+      `;
+
+      const data = await api(`/likes?user_id=${USER_ID}`);
+      const list = data.likes || [];
+      likesCount = list.length;
+      updateLikesDot();
+
+      if (list.length === 0) {
+        app.innerHTML = `
+          <div class="header"><h1>📬 Запросы</h1></div>
+          <div class="status">
+            <div class="icon">📭</div>
+            Нет новых запросов на сожительство
+          </div>`;
+        return;
+      }
+
+      let html = `
+        <div class="header">
+          <h1>📬 Запросы</h1>
+          <span class="badge">${list.length}</span>
+        </div>`;
+
+      list.forEach(p => {
+        html += `
+          <div class="card profile-view" data-id="${p.user_id}">
+            <h2>${esc(p.name || 'Без имени')}</h2>
+            <div class="meta">${p.age ? p.age + ' ' + yearWord(p.age) : '?'} · ${esc(p.univer || '')}</div>
+            ${p.about ? `<div class="section"><div class="lbl">О себе</div><div class="val">${esc(p.about)}</div></div>` : ''}
+            ${p.requirements ? `<div class="section"><div class="lbl">Пожелания</div><div class="val">${esc(p.requirements)}</div></div>` : ''}
+            <div class="reactions">
+              <button class="like" onclick="answerLike(${p.user_id}, 'like')">👍 Ответить</button>
+              <button class="dislike" onclick="answerLike(${p.user_id}, 'dislike')">👎 Пропустить</button>
+            </div>
+          </div>`;
+      });
+
+      app.innerHTML = html;
+    }
+
+    async function answerLike(likedId, reaction) {
+      try {
+        await api('/view', {
+          method: 'POST',
+          body: JSON.stringify({
+            user_id: USER_ID,
+            viewed_user_id: likedId,
+            reaction
+          })
+        });
+        if (reaction === 'like') {
+          toast('🎉 Совпадение! Смотрите сообщения в боте');
+          tg.HapticFeedback.notificationOccurred('success');
         }
+        await render();
+      } catch (e) {
+        toast('❌ ' + e.message);
+      }
+    }
 
-        function setStatus(text, id) {
-            const s = document.getElementById(id || 'status');
-            if (s) s.textContent = text;
-        }
+    function updateLikesDot() {
+      const dot = $('likes-dot');
+      if (likesCount > 0) dot.classList.remove('hidden');
+      else dot.classList.add('hidden');
+    }
 
-        // ---------- Вкладки ----------
-        function switchTab(tab) {
-            currentTab = tab;
-            document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
-            document.getElementById('tab-' + tab).classList.add('active');
-            render();
-        }
+    // ---------- XSS protection ----------
+    function esc(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
 
-        async function render() {
-            const app = document.getElementById('app');
-            app.innerHTML = '<div class="status">Загрузка...</div>';
-            if (currentTab === 'profile') await renderProfile(app);
-            else if (currentTab === 'find') await renderFind(app);
-            else if (currentTab === 'likes') await renderLikes(app);
-        }
+    // ---------- Bootstrap ----------
+    (async () => {
+      try {
+        const r = await api('/regions');
+        regions = r.regions || {};
+      } catch (e) {
+        console.error('Regions load failed', e);
+      }
 
-        // ---------- Вкладка "Анкета" ----------
-        async function renderProfile(app) {
-            const data = await api(`/profile?user_id=${USER_ID}`);
-            if (data.error) {
-                app.innerHTML = '<div class="status">Профиль не найден. Запустите бота командой /start</div>';
-                return;
-            }
+      // Preload likes count for badge
+      try {
+        const likesData = await api(`/likes?user_id=${USER_ID}`);
+        likesCount = (likesData.likes || []).length;
+        updateLikesDot();
+      } catch (_) {}
 
-            app.innerHTML = '';
-            app.appendChild(el('h1', {}, '👤 Моя анкета'));
-
-            const fields = [
-                ['name', 'Имя', 'text', 50],
-                ['age', 'Возраст', 'number', null],
-                ['univer', 'Учебное заведение', 'text', 100],
-                ['about', 'О себе', 'textarea', 1000],
-                ['requirements', 'Пожелания к соседу', 'textarea', 1000],
-            ];
-
-            fields.forEach(([key, label, type, max]) => {
-                const field = el('div', { class: 'field' });
-                field.appendChild(el('label', {}, label));
-                const input = type === 'textarea'
-                    ? el('textarea', { id: key, rows: 4 })
-                    : el('input', { id: key, type });
-                if (max) input.setAttribute('maxlength', max);
-                if (type === 'number') {
-                    input.setAttribute('min', 16);
-                    input.setAttribute('max', 100);
-                }
-                input.value = data[key] || '';
-                field.appendChild(input);
-                app.appendChild(field);
-            });
-
-            // Регион
-            const regionField = el('div', { class: 'field' });
-            regionField.appendChild(el('label', {}, 'Регион'));
-            const regionSelect = el('select', { id: 'region' });
-            regionSelect.appendChild(el('option', { value: '' }, '— выберите регион —'));
-            Object.keys(regions).forEach(r => {
-                const opt = el('option', { value: r }, r);
-                if (r === data.region) opt.selected = true;
-                regionSelect.appendChild(opt);
-            });
-            regionField.appendChild(regionSelect);
-            app.appendChild(regionField);
-
-            // Город
-            const cityField = el('div', { class: 'field' });
-            cityField.appendChild(el('label', {}, 'Город'));
-            const citySelect = el('select', { id: 'city' });
-            cityField.appendChild(citySelect);
-            app.appendChild(cityField);
-
-            function fillCities(region, selected) {
-                citySelect.innerHTML = '';
-                citySelect.appendChild(el('option', { value: '' }, '— выберите город —'));
-                if (regions[region]) {
-                    regions[region].forEach(c => {
-                        const opt = el('option', { value: c }, c);
-                        if (c === selected) opt.selected = true;
-                        citySelect.appendChild(opt);
-                    });
-                }
-            }
-
-            regionSelect.onchange = () => fillCities(regionSelect.value, null);
-            fillCities(data.region, data.city);
-
-            const saveBtn = el('button', { class: 'action', onclick: saveProfile }, '💾 Сохранить');
-            app.appendChild(saveBtn);
-            app.appendChild(el('div', { class: 'status', id: 'status' }, ''));
-        }
-
-        async function saveProfile() {
-            setStatus('Сохранение...');
-            const payload = {
-                user_id: USER_ID,
-                name: document.getElementById('name').value.trim(),
-                age: parseInt(document.getElementById('age').value, 10) || null,
-                univer: document.getElementById('univer').value.trim(),
-                about: document.getElementById('about').value.trim(),
-                requirements: document.getElementById('requirements').value.trim(),
-                region: document.getElementById('region').value,
-                city: document.getElementById('city').value,
-            };
-            const res = await api('/profile', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            if (res.ok) {
-                setStatus('✅ Сохранено');
-                tg.HapticFeedback.notificationOccurred('success');
-            } else {
-                setStatus('❌ ' + (res.error || 'Ошибка'));
-            }
-        }
-
-        // ---------- Вкладка "Поиск" ----------
-        async function renderFind(app) {
-            app.innerHTML = '';
-            app.appendChild(el('h1', {}, '🔍 Поиск соседа'));
-            const data = await api(`/find?user_id=${USER_ID}`);
-
-            if (data.error) {
-                app.innerHTML = `<div class="status">${data.error}</div>`;
-                return;
-            }
-            if (!data.profile) {
-                app.innerHTML = '<div class="status">Нет доступных анкет в вашем городе</div>';
-                const btn = el('button', { class: 'action', onclick: () => switchTab('profile') }, 'Заполнить анкету');
-                app.appendChild(btn);
-                return;
-            }
-
-            currentViewId = data.profile.user_id;
-            app.appendChild(buildProfileCard(data.profile));
-
-            const row = el('div', { class: 'action-row' });
-            row.appendChild(el('button', { class: 'btn-like', onclick: () => react('like') }, '👍'));
-            row.appendChild(el('button', { class: 'btn-dislike', onclick: () => react('dislike') }, '👎'));
-            row.appendChild(el('button', { class: 'btn-report', onclick: () => react('report') }, '⚠️'));
-            app.appendChild(row);
-
-            const skipBtn = el('button', { class: 'action', onclick: () => render() }, '➡️ Следующая анкета');
-            app.appendChild(skipBtn);
-        }
-
-        function buildProfileCard(p) {
-            const card = el('div', { class: 'profile-card' });
-            card.appendChild(el('h2', {}, p.name || 'Без имени'));
-            card.appendChild(el('div', { class: 'sub' }, `${p.age || '?'} лет · ${p.univer || ''}`));
-            if (p.about) {
-                const s = el('div', { class: 'section' });
-                s.appendChild(el('div', { class: 'label' }, 'О себе'));
-                s.appendChild(el('div', { class: 'value' }, p.about));
-                card.appendChild(s);
-            }
-            if (p.requirements) {
-                const s = el('div', { class: 'section' });
-                s.appendChild(el('div', { class: 'label' }, 'Пожелания к соседу'));
-                s.appendChild(el('div', { class: 'value' }, p.requirements));
-                card.appendChild(s);
-            }
-            return card;
-        }
-
-        async function react(reaction) {
-            await api('/view', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_id: USER_ID,
-                    viewed_user_id: currentViewId,
-                    reaction,
-                }),
-            });
-            tg.HapticFeedback.impactOccurred('light');
-            await render();
-        }
-
-        // ---------- Вкладка "Запросы" ----------
-        async function renderLikes(app) {
-            app.innerHTML = '';
-            app.appendChild(el('h1', {}, '📬 Запросы на сожительство'));
-            const data = await api(`/likes?user_id=${USER_ID}`);
-
-            if (!data.likes || data.likes.length === 0) {
-                app.innerHTML += '<div class="status">Нет новых лайков</div>';
-                return;
-            }
-
-            data.likes.forEach(p => {
-                const card = buildProfileCard(p);
-                const row = el('div', { class: 'action-row' });
-                row.appendChild(el('button', { class: 'btn-like', onclick: () => likeBack(p.user_id) }, '👍 Ответить'));
-                row.appendChild(el('button', { class: 'btn-dislike', onclick: () => skipLike(p.user_id) }, '👎 Пропустить'));
-                card.appendChild(row);
-                app.appendChild(card);
-            });
-        }
-
-        async function likeBack(likedUserId) {
-            await api('/view', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_id: USER_ID,
-                    viewed_user_id: likedUserId,
-                    reaction: 'like',
-                }),
-            });
-            tg.HapticFeedback.notificationOccurred('success');
-            await render();
-        }
-
-        async function skipLike(likedUserId) {
-            await api('/view', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_id: USER_ID,
-                    viewed_user_id: likedUserId,
-                    reaction: 'dislike',
-                }),
-            });
-            await render();
-        }
-
-        // ---------- Старт ----------
-        (async () => {
-            const r = await api('/regions');
-            regions = r.regions || {};
-            switchTab('profile');
-        })();
-    </script>
+      go('profile');
+    })();
+  </script>
 </body>
 </html>
