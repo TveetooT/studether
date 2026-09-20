@@ -1241,7 +1241,7 @@ async def webhook_refresher():
         except Exception as e:
             logger.error(f"❌ Ошибка при переустановке вебхука: {e}")
 
-WEBAPP_DIR = Path(__file__).parent / "webapp"
+WEBAPP_DIR = Path(__file__).parent / "webapp2"
 
 async def webapp_index(request):
     return web.FileResponse(WEBAPP_DIR / "index.html")
@@ -1402,13 +1402,13 @@ def create_app():
     app.router.add_post("/admin/ban/{user_id}", admin_ban)
     app.router.add_get("/admin/stats", admin_stats)
     app.router.add_get("/admin/logout", admin_logout)
-    app.router.add_get("/webapp", webapp_index)
-    app.router.add_get("/webapp/api/regions", webapp_regions)
-    app.router.add_get("/webapp/api/profile", webapp_profile)
-    app.router.add_post("/webapp/api/profile", webapp_profile)
-    app.router.add_get("/webapp/api/find", webapp_find)
-    app.router.add_post("/webapp/api/view", webapp_view)
-    app.router.add_get("/webapp/api/likes", webapp_likes)
+    app.router.add_get("/webapp2", webapp_index)
+    app.router.add_get("/webapp2/api/regions", webapp_regions)
+    app.router.add_get("/webapp2/api/profile", webapp_profile)
+    app.router.add_post("/webapp2/api/profile", webapp_profile)
+    app.router.add_get("/webapp2/api/find", webapp_find)
+    app.router.add_post("/webapp2/api/view", webapp_view)
+    app.router.add_get("/webapp2/api/likes", webapp_likes)
     # webhook
     from aiogram.webhook import aiohttp_server
     webhook_requests = aiohttp_server.SimpleRequestHandler(dispatcher=dp, bot=bot)
